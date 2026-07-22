@@ -37,3 +37,12 @@ through. The desired motion is explicitly progressive:
 - Next moves current identity left and incoming identity from the right;
   Previous mirrors the direction.
 - Circular queue behavior from v0.5.1 remains unchanged.
+
+## Local baseline decision
+
+Accepted on 2026-07-22 as the local baseline default Transition for continuing
+Aurora Local Music Alpha work.
+
+This acceptance does not promote the transition to a Production Motion Token.
+Performance validation, Reduced Motion validation and a formal Transition Engine
+decision remain future work.

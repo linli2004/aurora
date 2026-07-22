@@ -52,7 +52,7 @@ Proposed / Accepted / Rejected / Superseded
 
 | ID | 风险 | 等级 | 触发信号 | 缓解措施 | Owner | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| R-001 | Transition 在 Release 仍有最终帧跳变 | High | 视频出现硬交接 | 统一目标几何与状态机 | User | Open |
+| R-001 | Transition 在 Release 仍有最终帧跳变 | High | 视频出现硬交接 | 统一目标几何与状态机 | User | Mitigated for local baseline |
 | R-002 | QML 动画被 GUI 线程负载影响 | High | 音频/元数据更新时掉帧 | Animator / Render Thread / Profiler | User | Open |
 | R-003 | 大型音乐库扫描阻塞 UI | High | 扫描时窗口卡顿 | Worker + incremental model | User | Future |
 | R-004 | Metadata/Artwork 内存增长 | Medium | 多文件播放内存持续上涨 | Cache policy | User | Future |
@@ -65,15 +65,18 @@ Proposed / Accepted / Rejected / Superseded
 
 ---
 
-# Part C — Open Decisions
+# Part C — Decisions
 
-交接时建议立即建立以下决策项：
+已确认：
 
-1. 当前 Progressive Carousel 是否接受为默认 Transition？
-2. Transition Engine 是 QML 状态机还是 C++ Timeline Controller？
-3. Local Library 使用 SQLite 的最小 Schema 是什么？
-4. Artwork Cache 使用文件缓存还是数据库 Blob？
-5. Scene Framework 的公共语义输入是什么？
-6. MPRIS 在 Local Music Alpha 前还是后？
-7. Flatpak 与 `.deb` 的首个打包目标？
-8. Qt 最低版本是否固定为 6.8？
+1. 当前 Progressive Carousel v0.5.3 接受为本地基线默认 Transition。
+
+仍需后续决策：
+
+1. Transition Engine 是 QML 状态机还是 C++ Timeline Controller？
+2. Local Library 使用 SQLite 的最小 Schema 是什么？
+3. Artwork Cache 使用文件缓存还是数据库 Blob？
+4. Scene Framework 的公共语义输入是什么？
+5. MPRIS 在 Local Music Alpha 前还是后？
+6. Flatpak 与 `.deb` 的首个打包目标？
+7. Qt 最低版本是否固定为 6.8？

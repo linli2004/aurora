@@ -53,18 +53,19 @@
 - Progressive Landing；
 - Progressive Carousel 候选方案。
 
-当前最终手感尚未冻结。
+当前 v0.5.3 Progressive Carousel 已接受为本地基线默认 Transition。
 
 应将其标记为：
 
 ```text
-Transition Motion Candidate
-○ Product Acceptance Pending
+Transition Motion Baseline
+● Product Accepted for Local Baseline
 ○ Performance Validation Pending
 ○ Reduced Motion Validation Pending
 ```
 
-不要把某个聊天中生成的版本直接当成最终 Motion Token。
+该结论不代表 Production Motion Token；正式 Transition Engine、性能预算和
+Reduced Motion 仍需后续任务验证。
 
 ## Crystal
 
@@ -234,8 +235,8 @@ Visual Evidence:
 `aurora_snapshot_smoke` with `QT_QPA_PLATFORM=offscreen`. Image is 1280x820 PNG.
 
 Current Accepted Transition:
-Progressive Carousel remains a Transition Motion Candidate. Product acceptance,
-performance validation and Reduced Motion validation remain pending.
+Progressive Carousel v0.5.3 is accepted as the local baseline default
+Transition. Performance validation and Reduced Motion validation remain pending.
 
 Known Local Issues:
 Qt QML plugin link-target configure warnings were resolved by disabling import
