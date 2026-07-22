@@ -1,0 +1,12 @@
+{
+  "name": "Aurora Local Development Handoff",
+  "version": "1.0",
+  "date": "2026-07-22",
+  "role_split": {
+    "user_and_codex": "coding, local builds, implementation, git integration",
+    "chatgpt": "product/architecture review, planning, diagnosis, acceptance, documentation guidance"
+  },
+  "recommended_repo_path": "docs/handoff/",
+  "first_task": "AUR-013 Freeze Local Handoff Baseline",
+  "code_source_of_truth": "local Git HEAD"
+}

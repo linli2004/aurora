@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "tracks": [
+    {
+      "id": "track-quiet-signals",
+      "title": "Quiet Signals",
+      "artist": "Aurora Demo",
+      "album": "Initial Light",
+      "artwork": "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png",
+      "spatialCharacter": "Wide",
+      "identitySignature": {
+        "artworkAnchor": {
+          "x": 0.5,
+          "y": 0.44
+        },
+        "colorSignature": [
+          "#6E82B7",
+          "#B39BCB",
+          "#151821"
+        ],
+        "opticalGravity": {
+          "x": 0.5,
+          "y": 0.46
+        }
+      },
+      "provenance": {
+        "source": "Local Fixture",
+        "processingLocation": "Device",
+        "generatedBy": "Aurora Bootstrap",
+        "userConfirmed": false,
+        "lastUpdated": "2026-07-21T23:55:00-07:00",
+        "modelVersion": "fixture-1"
+      }
+    }
+  ]
+}

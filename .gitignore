@@ -1,0 +1,11 @@
+/build/
+/build-*/
+/.cache/
+/.idea/
+/.vscode/
+*.user
+*.user.*
+*.qmlc
+*.jsc
+__pycache__/
+.DS_Store

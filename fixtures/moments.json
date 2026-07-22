@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "moments": [
+    {
+      "id": "moment-late-summer-night",
+      "musicIdentityReference": "track-quiet-signals",
+      "temporalIdentity": {
+        "timestamp": "2026-07-21T23:40:00-07:00",
+        "localTimezone": "America/Los_Angeles",
+        "periodSemantic": {
+          "season": "Summer",
+          "dayPart": "LateNight"
+        },
+        "periodLabelOverride": ""
+      },
+      "emotionalIdentity": {
+        "primary": "Nostalgia",
+        "secondary": "Warmth",
+        "intensity": 0.58,
+        "evolution": [
+          "Loneliness",
+          "Acceptance",
+          "Calm"
+        ]
+      },
+      "contextIdentity": {
+        "device": "Laptop",
+        "listeningPattern": "RepeatedListening",
+        "environment": "NightSession",
+        "externalContextEnabled": false
+      },
+      "suggestedMeaning": {
+        "relation": "A recurring late-night listening pattern",
+        "source": "Aurora Local Runtime",
+        "confidence": 0.62
+      },
+      "confirmedMeaning": {
+        "userNote": "A quiet beginning.",
+        "personalTags": [
+          "summer",
+          "home"
+        ],
+        "importance": 0.78,
+        "confirmedAt": "2026-07-21T23:55:00-07:00"
+      },
+      "memoryIdentity": {
+        "lifecycle": "Meaningful",
+        "confidence": 0.9,
+        "ownership": "PersonalMemory",
+        "preservationLevel": "Remembered",
+        "availability": "Active"
+      },
+      "memoryWeight": {
+        "intensity": 0.42,
+        "depth": 0.78,
+        "personalMeaning": 0.78
+      },
+      "provenance": {
+        "source": "Local Fixture",
+        "processingLocation": "Device",
+        "generatedBy": "Aurora Bootstrap",
+        "userConfirmed": true,
+        "lastUpdated": "2026-07-21T23:55:00-07:00",
+        "modelVersion": "fixture-1"
+      }
+    }
+  ]
+}
