@@ -99,7 +99,7 @@ Provenance
 
 ---
 
-# AUR-017 — SQLite Repository ADR
+# AUR-017 — Local Repository and Identity Persistence ADR
 
 只做设计和 ADR：
 
@@ -111,6 +111,10 @@ Provenance
 - Detached；
 - Library size；
 - Threading。
+- Track / TrackSource；
+- Provisional Identity；
+- Identity Algorithm Version；
+- Export / Provenance。
 
 评审后再编码。
 
