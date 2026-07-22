@@ -24,6 +24,9 @@ Implemented as an initial scaffold:
 - Stable local Track ID, path-scoped Source ID, canonical title and availability fields
 - SQLite-backed local library repository with Track / TrackSource persistence
 - Recursive local folder scan for supported audio files
+- Scanner progress, cancellation and repository-backed track list refresh
+- Local library Tracks browser with search and click-to-play queue creation
+- Minimal playback session restore for queue, current index and volume
 - Embedded artwork extraction with a trusted Generated Identity fallback
 - Decoded-audio feature analysis for level, bass, mid, high and transient presence
 - Audio-reactive Atmosphere with Reduced Motion and Eco fallbacks
@@ -34,7 +37,8 @@ Implemented as an initial scaffold:
 
 Deferred:
 
-- Full metadata index refinement and scanner cancellation/progress details
+- Full metadata index refinement, albums view and delete/relink commands
+- Full persistent queue state including position, scene and transition personality
 - Emotion Graph and Intelligence Layer
 - Production Memory persistence
 - Online music providers
@@ -77,6 +81,15 @@ cmake --build --preset dev
 8. Pause and confirm the atmosphere settles back to quiet.
 9. Select at least two files, then use Previous/Next to verify the Liquid Flow identity handoff.
 10. Use Shift+Left/Right for track changes; plain Left/Right still seeks by five seconds.
+
+## Local Library Demo Flow
+
+1. Open a Moment and enter Music Space.
+2. Press `Ctrl+L` or select **Scan folder**.
+3. Choose a local music directory and watch the scan count update.
+4. Use **Cancel** during a long scan if needed.
+5. Search the Tracks panel, click a row to play from that track, or select **Play list**.
+6. Restart Aurora and confirm the last queue, current track and volume return without autoplay.
 
 ## Run Tests
 

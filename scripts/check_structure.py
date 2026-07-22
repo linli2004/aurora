@@ -25,6 +25,8 @@ REQUIRED = [
     "runtime/library/LocalLibraryRepository.cpp",
     "runtime/library/LocalLibraryService.h",
     "runtime/library/LocalLibraryService.cpp",
+    "runtime/library/LocalLibraryTrackModel.h",
+    "runtime/library/LocalLibraryTrackModel.cpp",
     "qml/Main.qml",
     "qml/AuroraTokens.qml",
     "qml/AudioDiagnostics.qml",

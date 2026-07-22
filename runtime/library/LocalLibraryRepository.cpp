@@ -18,6 +18,11 @@ QString optionalTime(const QDateTime &value)
     return value.isValid() ? value.toUTC().toString(Qt::ISODateWithMs) : QString();
 }
 
+QDateTime parseTime(const QString &value)
+{
+    return QDateTime::fromString(value, Qt::ISODateWithMs);
+}
+
 QString nonNull(const QString &value)
 {
     return value.isNull() ? QStringLiteral("") : value;
@@ -92,6 +97,70 @@ QStringList LocalLibraryRepository::playableFilePaths() const
     return paths;
 }
 
+QList<LocalLibraryTrackRecord> LocalLibraryRepository::tracks(const QString &searchText) const
+{
+    QList<LocalLibraryTrackRecord> records;
+    QSqlQuery query(m_database);
+    const QString trimmedSearch = searchText.trimmed().toCaseFolded();
+    const bool hasSearch = !trimmedSearch.isEmpty();
+
+    QString sql = QStringLiteral(
+        "SELECT t.track_id, s.source_id, t.canonical_title, t.artist, t.album, "
+        "s.file_path, s.availability, s.file_size, s.modified_time "
+        "FROM track_sources s "
+        "JOIN tracks t ON t.track_id = s.track_id "
+        "WHERE s.availability = 'Available'");
+    if (hasSearch) {
+        sql += QStringLiteral(
+            " AND (t.canonical_title LIKE ? OR t.artist LIKE ? OR t.album LIKE ? "
+            "OR s.file_path LIKE ?)");
+    }
+    sql += QStringLiteral(" ORDER BY t.canonical_title, s.file_path");
+
+    if (!query.prepare(sql))
+        return records;
+
+    if (hasSearch) {
+        const QString pattern = QStringLiteral("%%1%").arg(trimmedSearch);
+        query.addBindValue(pattern);
+        query.addBindValue(pattern);
+        query.addBindValue(pattern);
+        query.addBindValue(pattern);
+    }
+
+    if (!query.exec())
+        return records;
+
+    while (query.next()) {
+        LocalLibraryTrackRecord record;
+        record.trackId = query.value(0).toString();
+        record.sourceId = query.value(1).toString();
+        record.title = query.value(2).toString();
+        record.artist = query.value(3).toString();
+        record.album = query.value(4).toString();
+        record.filePath = query.value(5).toString();
+        record.availability = query.value(6).toString();
+        record.fileSize = query.value(7).toLongLong();
+        record.modifiedTime = parseTime(query.value(8).toString());
+        records.append(record);
+    }
+
+    return records;
+}
+
+QVariantMap LocalLibraryRepository::setting(const QString &key) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("SELECT value_json FROM settings WHERE key = ?"));
+    query.addBindValue(key);
+
+    if (!query.exec() || !query.next())
+        return {};
+
+    const QJsonDocument document = QJsonDocument::fromJson(query.value(0).toByteArray());
+    return document.isObject() ? document.object().toVariantMap() : QVariantMap {};
+}
+
 bool LocalLibraryRepository::initializeSchema()
 {
     return execSchema(QStringLiteral(
@@ -130,6 +199,11 @@ bool LocalLibraryRepository::initializeSchema()
                "updated_at TEXT NOT NULL,"
                "provenance_json TEXT NOT NULL,"
                "FOREIGN KEY(track_id) REFERENCES tracks(track_id))"))
+        && execSchema(QStringLiteral(
+               "CREATE TABLE IF NOT EXISTS settings ("
+               "key TEXT PRIMARY KEY,"
+               "value_json TEXT NOT NULL,"
+               "updated_at TEXT NOT NULL)"))
         && execSchema(QStringLiteral(
                "CREATE INDEX IF NOT EXISTS idx_track_sources_track_id "
                "ON track_sources(track_id)"))
@@ -222,6 +296,26 @@ bool LocalLibraryRepository::upsertSource(const LocalLibrarySourceRecord &record
     }
 
     return true;
+}
+
+bool LocalLibraryRepository::setSetting(const QString &key, const QVariantMap &value)
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(
+        "INSERT INTO settings(key, value_json, updated_at) VALUES(?, ?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET "
+        "value_json = excluded.value_json,"
+        "updated_at = excluded.updated_at"));
+    query.addBindValue(key);
+    query.addBindValue(QString::fromUtf8(
+        QJsonDocument(QJsonObject::fromVariantMap(value)).toJson(QJsonDocument::Compact)));
+    query.addBindValue(nowUtc());
+
+    if (query.exec())
+        return true;
+
+    m_lastError = query.lastError().text();
+    return false;
 }
 
 QString LocalLibraryRepository::identityState(const LocalTrackIdentity &identity) const

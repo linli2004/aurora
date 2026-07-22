@@ -121,6 +121,8 @@ private:
     void loadCurrent(bool autoplay);
     void applyTrackIdentity(const LocalTrackIdentity &identity);
     void refreshTrackIdentity();
+    void restoreSession();
+    void persistSession();
     void setErrorString(const QString &message);
 
     QMediaPlayer m_player;

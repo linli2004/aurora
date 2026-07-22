@@ -95,14 +95,15 @@ Reduced Motion 仍需后续任务验证。
 ## 部分实现
 
 - 稳定 Track ID 已具备 Local Alpha v0.1 契约；
-- 本地音乐库扫描与 SQLite 持久化已具备第一条纵切；
-- Local Library Alpha 仍缺少取消、详细进度、metadata index refinement、
-  delete/relink 和持久队列。
+- 本地音乐库扫描、SQLite 持久化、Tracks 浏览、搜索和点选播放已形成
+  Local Alpha demo 闭环；
+- Scanner 已具备后台执行、进度计数、取消和 UI 刷新；
+- 播放队列已具备最小会话恢复：队列 URL、当前索引和音量。
 
 ## 尚未实现
 
-- 播放队列持久化；
-- 收藏、最近播放和设置；
+- 完整播放队列持久化，包括播放位置、Scene 和 Transition Personality；
+- 收藏、最近播放和用户设置 UI；
 - MPRIS 系统媒体控制；
 - Aurora Memory Engine；
 - Moment Capture / Keep This Moment；
@@ -123,8 +124,8 @@ Reduced Motion 仍需后续任务验证。
 1. QML 动画手感依赖 Release 构建、VSync、显示器刷新率和 GNOME 合成；
 2. 复杂 QML 属性动画可能受 GUI 线程负载影响；
 3. Audio Buffer 分析依赖 Qt Multimedia 后端能力；
-4. 当前元数据索引是播放时解析，不适合大型音乐库；
-5. 当前队列只在内存中存在；
+4. 当前元数据索引仍主要来自文件名/播放时元数据，不适合大型音乐库；
+5. 当前队列恢复只保存 URL、索引和音量，尚未保存位置和场景人格；
 6. 视觉参数仍可能散落在 QML 内部；
 7. 现有 Changelog 中存在重复一级标题，需要整理；
 8. Snapshot Harness 目录存在，但还没有形成完整自动视觉回归；

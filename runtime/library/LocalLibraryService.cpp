@@ -41,6 +41,7 @@ LocalLibraryService::LocalLibraryService(QObject *parent)
     , m_databasePath(defaultDatabasePath())
 {
     refreshCounts();
+    refreshTracks();
 }
 
 bool LocalLibraryService::scanning() const
@@ -73,6 +74,26 @@ QString LocalLibraryService::errorString() const
     return m_errorString;
 }
 
+int LocalLibraryService::scannedFileCount() const
+{
+    return m_scannedFileCount;
+}
+
+QString LocalLibraryService::searchText() const
+{
+    return m_searchText;
+}
+
+int LocalLibraryService::visibleTrackCount() const
+{
+    return m_trackModel.rowCount();
+}
+
+QAbstractListModel *LocalLibraryService::tracks()
+{
+    return &m_trackModel;
+}
+
 void LocalLibraryService::scanDirectory(const QUrl &directory)
 {
     if (m_scanning)
@@ -90,14 +111,18 @@ void LocalLibraryService::scanDirectory(const QUrl &directory)
     }
 
     setErrorString({});
+    setScannedFileCount(0);
     setLastScanStatus(tr("Scanning %1").arg(QDir::toNativeSeparators(rootInfo.absoluteFilePath())));
     setScanning(true);
 
     const QString rootPath = rootInfo.canonicalFilePath();
     const QString databasePath = m_databasePath;
-    QThread *worker = QThread::create([this, rootPath, databasePath]() {
+    m_cancelScan = std::make_shared<std::atomic_bool>(false);
+    const std::shared_ptr<std::atomic_bool> cancelFlag = m_cancelScan;
+    QThread *worker = QThread::create([this, rootPath, databasePath, cancelFlag]() {
         LocalLibraryRepository repository;
         int scanned = 0;
+        bool cancelled = false;
         QString error;
 
         if (!repository.open(databasePath)) {
@@ -109,6 +134,11 @@ void LocalLibraryService::scanDirectory(const QUrl &directory)
                 QDirIterator::Subdirectories);
 
             while (iterator.hasNext()) {
+                if (cancelFlag->load()) {
+                    cancelled = true;
+                    break;
+                }
+
                 const QString filePath = iterator.next();
                 const QFileInfo fileInfo(filePath);
                 if (!supportedAudioFile(fileInfo))
@@ -126,22 +156,41 @@ void LocalLibraryService::scanDirectory(const QUrl &directory)
                 }
 
                 ++scanned;
+                if (scanned == 1 || scanned % 25 == 0) {
+                    QMetaObject::invokeMethod(this, [this, scanned]() {
+                        setScannedFileCount(scanned);
+                    }, Qt::QueuedConnection);
+                }
             }
         }
 
-        QMetaObject::invokeMethod(this, [this, scanned, error]() {
+        QMetaObject::invokeMethod(this, [this, scanned, cancelled, error]() {
             if (!error.isEmpty())
                 setErrorString(error);
+            setScannedFileCount(scanned);
             refreshCounts();
+            refreshTracks();
             setLastScanStatus(error.isEmpty()
-                ? tr("Scanned %1 local audio files").arg(scanned)
+                ? (cancelled
+                    ? tr("Scan cancelled after %1 local audio files").arg(scanned)
+                    : tr("Scanned %1 local audio files").arg(scanned))
                 : tr("Scan failed"));
             setScanning(false);
+            m_cancelScan.reset();
         }, Qt::QueuedConnection);
     });
 
     connect(worker, &QThread::finished, worker, &QObject::deleteLater);
     worker->start();
+}
+
+void LocalLibraryService::cancelScan()
+{
+    if (!m_scanning || !m_cancelScan)
+        return;
+
+    m_cancelScan->store(true);
+    setLastScanStatus(tr("Cancelling scan"));
 }
 
 QVariantList LocalLibraryService::playableUrls() const
@@ -156,6 +205,27 @@ QVariantList LocalLibraryService::playableUrls() const
     for (const QString &path : paths)
         urls.append(QUrl::fromLocalFile(path));
     return urls;
+}
+
+QVariantList LocalLibraryService::visiblePlayableUrls() const
+{
+    return m_trackModel.urls();
+}
+
+QVariantList LocalLibraryService::visiblePlayableUrlsStartingAt(int row) const
+{
+    return m_trackModel.urlsStartingAt(row);
+}
+
+void LocalLibraryService::setSearchText(const QString &searchText)
+{
+    const QString normalized = searchText.trimmed();
+    if (m_searchText == normalized)
+        return;
+
+    m_searchText = normalized;
+    emit searchChanged();
+    refreshTracks();
 }
 
 void LocalLibraryService::refreshCounts()
@@ -176,6 +246,19 @@ void LocalLibraryService::refreshCounts()
     m_trackCount = tracks;
     m_sourceCount = sources;
     emit libraryChanged();
+}
+
+void LocalLibraryService::refreshTracks()
+{
+    LocalLibraryRepository repository;
+    if (!repository.open(m_databasePath)) {
+        m_trackModel.setRecords({});
+        emit tracksChanged();
+        return;
+    }
+
+    m_trackModel.setRecords(repository.tracks(m_searchText));
+    emit tracksChanged();
 }
 
 void LocalLibraryService::setScanning(bool scanning)
@@ -203,4 +286,13 @@ void LocalLibraryService::setErrorString(const QString &message)
 
     m_errorString = message;
     emit errorChanged();
+}
+
+void LocalLibraryService::setScannedFileCount(int count)
+{
+    if (m_scannedFileCount == count)
+        return;
+
+    m_scannedFileCount = count;
+    emit scanProgressChanged();
 }

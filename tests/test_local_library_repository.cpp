@@ -14,6 +14,8 @@ class LocalLibraryRepositoryTest final : public QObject
 private slots:
     void createsSchemaAndPersistsTrackSource();
     void duplicateContentCreatesOneTrackAndMultipleSources();
+    void readsTracksWithSearchText();
+    void persistsSettings();
 };
 
 namespace {
@@ -73,6 +75,55 @@ void LocalLibraryRepositoryTest::duplicateContentCreatesOneTrackAndMultipleSourc
     QCOMPARE(repository.trackCount(), 1);
     QCOMPARE(repository.sourceCount(), 2);
     QCOMPARE(repository.playableFilePaths().size(), 2);
+}
+
+void LocalLibraryRepositoryTest::readsTracksWithSearchText()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString audioPath = directory.filePath(QStringLiteral("Night Signal.ogg"));
+    QFile audioFile(audioPath);
+    QVERIFY(audioFile.open(QIODevice::WriteOnly));
+    audioFile.write("searchable audio bytes");
+    audioFile.close();
+
+    LocalLibraryRepository repository(QStringLiteral("aurora-repo-test-search"));
+    QVERIFY(repository.open(directory.filePath(QStringLiteral("library.sqlite"))));
+    QVERIFY2(repository.upsertSource(recordForFile(audioPath)),
+             qPrintable(repository.lastError()));
+
+    const QList<LocalLibraryTrackRecord> allTracks = repository.tracks();
+    QCOMPARE(allTracks.size(), 1);
+    QCOMPARE(allTracks.first().title, QStringLiteral("night signal"));
+    QCOMPARE(allTracks.first().filePath, QFileInfo(audioPath).canonicalFilePath());
+
+    QCOMPARE(repository.tracks(QStringLiteral("night")).size(), 1);
+    QCOMPARE(repository.tracks(QStringLiteral("missing")).size(), 0);
+}
+
+void LocalLibraryRepositoryTest::persistsSettings()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString databasePath = directory.filePath(QStringLiteral("library.sqlite"));
+    {
+        LocalLibraryRepository repository(QStringLiteral("aurora-repo-test-settings-write"));
+        QVERIFY(repository.open(databasePath));
+
+        QVariantMap value;
+        value.insert(QStringLiteral("currentIndex"), 2);
+        value.insert(QStringLiteral("volume"), 0.5);
+        QVERIFY2(repository.setSetting(QStringLiteral("playback.session.v1"), value),
+                 qPrintable(repository.lastError()));
+    }
+
+    LocalLibraryRepository repository(QStringLiteral("aurora-repo-test-settings-read"));
+    QVERIFY(repository.open(databasePath));
+    const QVariantMap value = repository.setting(QStringLiteral("playback.session.v1"));
+    QCOMPARE(value.value(QStringLiteral("currentIndex")).toInt(), 2);
+    QCOMPARE(value.value(QStringLiteral("volume")).toReal(), 0.5);
 }
 
 QTEST_GUILESS_MAIN(LocalLibraryRepositoryTest)

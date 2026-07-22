@@ -8,7 +8,7 @@ Implemented the first Local Music Alpha library slice.
 
 - `LocalLibraryRepository`: SQLite schema and Track / TrackSource upsert.
 - `LocalLibraryService`: runtime singleton for background folder scanning,
-  counts, status, errors and playable URL export.
+  counts, progress, cancellation, status, errors and playable URL export.
 - Music Space library panel with scan-folder and play-library actions.
 - Repository tests for schema creation, single source round trip and duplicate
   content with multiple sources.
@@ -22,7 +22,7 @@ Implemented the first Local Music Alpha library slice.
 
 ## Known limits
 
-- Scan cancellation and fine-grained progress are not implemented yet.
+- Progress is currently file-count based, not byte-count based.
 - Metadata extraction during scan is filename fallback only.
 - Artwork table/cache migration is deferred.
 - Delete, relink and source availability refresh UI are deferred.

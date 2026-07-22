@@ -25,6 +25,7 @@ semantic service state and sends commands.
 - Repository upsert for local sources.
 - Recursive scanner for local audio file extensions.
 - Background scan worker.
+- Scan progress count and cancellation.
 - QML scan-folder entry in Music Space.
 - Load scanned sources into the in-memory playback queue.
 - Repository unit tests.
@@ -33,7 +34,6 @@ semantic service state and sends commands.
 
 - Metadata extraction during scan.
 - Artwork cache table.
-- Scanner cancellation and detailed progress.
 - File watcher.
 - Delete/relink UI.
 - Persistent queue.

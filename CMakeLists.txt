@@ -31,6 +31,8 @@ qt_add_executable(aurora
     runtime/library/LocalLibraryRepository.h
     runtime/library/LocalLibraryService.cpp
     runtime/library/LocalLibraryService.h
+    runtime/library/LocalLibraryTrackModel.cpp
+    runtime/library/LocalLibraryTrackModel.h
 )
 
 set(AURORA_QML_FILES
@@ -185,6 +187,8 @@ if(BUILD_TESTING)
         runtime/library/LocalLibraryRepository.h
         runtime/library/LocalLibraryService.cpp
         runtime/library/LocalLibraryService.h
+        runtime/library/LocalLibraryTrackModel.cpp
+        runtime/library/LocalLibraryTrackModel.h
     )
     set_target_properties(aurora_snapshot_smoke PROPERTIES
         QT_QML_MODULE_NO_IMPORT_SCAN TRUE

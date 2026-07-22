@@ -1,9 +1,38 @@
 #include "runtime/audio/AudioRuntime.h"
 
+#include <QDir>
 #include <QFileInfo>
+#include <QStandardPaths>
 #include <QtGlobal>
 
 #include "runtime/AuroraTypes.h"
+#include "runtime/library/LocalLibraryRepository.h"
+
+namespace {
+QString libraryDatabasePath()
+{
+    QString dataLocation = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (dataLocation.isEmpty())
+        dataLocation = QDir::home().filePath(QStringLiteral(".local/share/Aurora"));
+
+    QDir directory;
+    directory.mkpath(dataLocation);
+    return QDir(dataLocation).filePath(QStringLiteral("library.sqlite"));
+}
+
+QList<QUrl> urlsFromSetting(const QVariant &value)
+{
+    QList<QUrl> urls;
+    const QVariantList values = value.toList();
+    urls.reserve(values.size());
+    for (const QVariant &entry : values) {
+        const QUrl url(entry.toString());
+        if (url.isValid() && !url.isEmpty())
+            urls.append(url);
+    }
+    return urls;
+}
+}
 
 AudioRuntime::AudioRuntime(QObject *parent)
     : QObject(parent)
@@ -44,6 +73,7 @@ AudioRuntime::AudioRuntime(QObject *parent)
                 if (status == QMediaPlayer::EndOfMedia && m_queue.moveNext()) {
                     emit queueChanged();
                     loadCurrent(true);
+                    persistSession();
                 }
             });
 
@@ -52,6 +82,8 @@ AudioRuntime::AudioRuntime(QObject *parent)
                 setErrorString(message.isEmpty() ? tr("Unable to play this audio file.") : message);
                 emit semanticStateChanged();
             });
+
+    restoreSession();
 }
 
 QUrl AudioRuntime::source() const
@@ -239,6 +271,7 @@ void AudioRuntime::setQueue(const QVariantList &urls)
     m_queue.setUrls(filtered);
     emit queueChanged();
     loadCurrent(true);
+    persistSession();
 }
 
 void AudioRuntime::appendFiles(const QVariantList &urls)
@@ -255,6 +288,7 @@ void AudioRuntime::appendFiles(const QVariantList &urls)
 
     if (wasEmpty)
         loadCurrent(true);
+    persistSession();
 }
 
 void AudioRuntime::clearQueue()
@@ -267,6 +301,7 @@ void AudioRuntime::clearQueue()
     setErrorString({});
     emit queueChanged();
     emit semanticStateChanged();
+    persistSession();
 }
 
 void AudioRuntime::play()
@@ -303,6 +338,7 @@ void AudioRuntime::next()
     if (m_queue.moveNext()) {
         emit queueChanged();
         loadCurrent(true);
+        persistSession();
     }
 }
 
@@ -311,6 +347,7 @@ void AudioRuntime::previous()
     if (m_queue.movePrevious()) {
         emit queueChanged();
         loadCurrent(true);
+        persistSession();
     }
 }
 
@@ -328,6 +365,7 @@ void AudioRuntime::setPosition(qint64 position)
 void AudioRuntime::setVolume(qreal volume)
 {
     m_audioOutput.setVolume(qBound<qreal>(0.0, volume, 1.0));
+    persistSession();
 }
 
 QList<QUrl> AudioRuntime::validLocalFiles(const QList<QUrl> &urls) const
@@ -362,6 +400,45 @@ void AudioRuntime::loadCurrent(bool autoplay)
 
     if (autoplay)
         m_player.play();
+}
+
+void AudioRuntime::restoreSession()
+{
+    LocalLibraryRepository repository;
+    if (!repository.open(libraryDatabasePath()))
+        return;
+
+    const QVariantMap session = repository.setting(QStringLiteral("playback.session.v1"));
+    const QList<QUrl> urls = validLocalFiles(urlsFromSetting(session.value(QStringLiteral("urls"))));
+    if (urls.isEmpty())
+        return;
+
+    m_audioOutput.setVolume(qBound<qreal>(
+        0.0,
+        session.value(QStringLiteral("volume"), m_audioOutput.volume()).toReal(),
+        1.0));
+    m_queue.setUrls(urls);
+    m_queue.moveTo(session.value(QStringLiteral("currentIndex"), 0).toInt());
+    emit queueChanged();
+    loadCurrent(false);
+}
+
+void AudioRuntime::persistSession()
+{
+    LocalLibraryRepository repository;
+    if (!repository.open(libraryDatabasePath()))
+        return;
+
+    QVariantList urls;
+    urls.reserve(m_queue.urls().size());
+    for (const QUrl &url : m_queue.urls())
+        urls.append(url.toString());
+
+    QVariantMap session;
+    session.insert(QStringLiteral("urls"), urls);
+    session.insert(QStringLiteral("currentIndex"), m_queue.currentIndex());
+    session.insert(QStringLiteral("volume"), m_audioOutput.volume());
+    repository.setSetting(QStringLiteral("playback.session.v1"), session);
 }
 
 void AudioRuntime::applyTrackIdentity(const LocalTrackIdentity &identity)

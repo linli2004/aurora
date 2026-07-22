@@ -131,7 +131,7 @@ Accepted for Local Alpha implementation.
 Status:
 
 ```text
-Initial scanner/repository vertical slice implemented.
+Implemented for Local Alpha demo.
 ```
 
 依赖 AUR-016、AUR-017。
@@ -151,6 +151,12 @@ Initial scanner/repository vertical slice implemented.
 
 # AUR-019 — Local Library UI
 
+Status:
+
+```text
+Implemented for Local Alpha demo.
+```
+
 第一版应保持克制：
 
 - 最近播放；
@@ -165,10 +171,17 @@ Initial scanner/repository vertical slice implemented.
 
 # AUR-020 — Persistent Queue and Session Restore
 
+Status:
+
+```text
+Minimal demo subset implemented.
+Full contract still pending.
+```
+
 - 队列保存；
 - 当前索引；
-- 当前位置；
 - 音量；
+- 当前位置；
 - Scene；
 - Transition Personality；
 - 异常退出恢复。

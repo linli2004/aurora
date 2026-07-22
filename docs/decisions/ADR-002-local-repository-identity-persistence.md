@@ -74,6 +74,11 @@ TrackSource
 ├ created_at
 ├ updated_at
 └ provenance_json
+
+Settings
+├ key
+├ value_json
+└ updated_at
 ```
 
 ## Identity State
@@ -185,6 +190,12 @@ CREATE TABLE track_sources (
 CREATE INDEX idx_track_sources_track_id ON track_sources(track_id);
 CREATE INDEX idx_track_sources_file_path ON track_sources(file_path);
 CREATE INDEX idx_tracks_canonical_title ON tracks(canonical_title);
+
+CREATE TABLE settings (
+    key TEXT PRIMARY KEY,
+    value_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 ```
 
 Deferred tables for the first repository implementation:
@@ -193,7 +204,6 @@ Deferred tables for the first repository implementation:
 track_metadata
 artwork
 queue_items
-settings
 track_aliases
 ```
 

@@ -5,7 +5,11 @@
 - Added the first SQLite-backed local library repository with Track and TrackSource tables.
 - Added recursive local folder scanning for supported audio files.
 - Added a Music Space library panel for scanning a folder and loading scanned sources into the queue.
+- Added scan progress and cancellation controls for long local library scans.
+- Added a repository-backed Tracks browser with search and click-to-play behavior.
+- Added minimal playback session restore for queue URLs, current index and volume.
 - Added repository tests for schema creation, TrackSource persistence and duplicate content.
+- Added repository tests for track search and settings persistence.
 - Added stable local Track ID generation from bounded file-content sampling.
 - Added path-scoped Source ID, canonical title, file path and availability fields.
 - Exposed local identity fields through the C++ audio runtime as read-only QML properties.
