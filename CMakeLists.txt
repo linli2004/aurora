@@ -71,6 +71,7 @@ set_source_files_properties(fixtures/tracks.json
 qt_add_qml_module(aurora
     URI Aurora.App
     VERSION 1.0
+    NO_IMPORT_SCAN
     QML_FILES ${AURORA_QML_FILES}
     RESOURCES
         assets/demo-cover-a.png
@@ -144,6 +145,44 @@ if(BUILD_TESTING)
         Qt6::Test
     )
     add_test(NAME aurora.audio_features COMMAND aurora_audio_feature_tests)
+
+    qt_add_executable(aurora_snapshot_smoke
+        tests/snapshot_smoke.cpp
+        runtime/AuroraStateMapper.cpp
+        runtime/AuroraStateMapper.h
+        runtime/AuroraTypes.h
+        runtime/audio/AudioFeatureAnalyzer.cpp
+        runtime/audio/AudioFeatureAnalyzer.h
+        runtime/audio/AudioQueue.cpp
+        runtime/audio/AudioQueue.h
+        runtime/audio/AudioRuntime.cpp
+        runtime/audio/AudioRuntime.h
+        runtime/audio/LocalTrackIdentity.cpp
+        runtime/audio/LocalTrackIdentity.h
+    )
+    set_target_properties(aurora_snapshot_smoke PROPERTIES
+        QT_QML_MODULE_NO_IMPORT_SCAN TRUE
+    )
+    target_include_directories(aurora_snapshot_smoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(aurora_snapshot_smoke PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Qml
+        Qt6::Quick
+        Qt6::Multimedia
+    )
+    qt_add_qml_module(aurora_snapshot_smoke
+        URI Aurora.App
+        VERSION 1.0
+        OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/snapshot/Aurora/App"
+        NO_IMPORT_SCAN
+        QML_FILES ${AURORA_QML_FILES}
+        RESOURCES
+            assets/demo-cover-a.png
+            assets/demo-cover-b.png
+            fixtures/moments.json
+            fixtures/tracks.json
+    )
 
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)

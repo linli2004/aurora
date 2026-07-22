@@ -1,8 +1,12 @@
 #include <QGuiApplication>
-#include <cstdlib>
-#include <QQmlApplicationEngine>
+#include <QImage>
 #include <QJSEngine>
+#include <QQmlApplicationEngine>
+#include <QQuickWindow>
+#include <QTimer>
 #include <QtQml/qqml.h>
+
+#include <cstdlib>
 
 #include "runtime/AuroraStateMapper.h"
 #include "runtime/AuroraTypes.h"
@@ -11,9 +15,10 @@
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
-    QCoreApplication::setOrganizationName(QStringLiteral("Aurora"));
-    QCoreApplication::setApplicationName(QStringLiteral("Aurora Music Framework"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("0.5.3"));
+
+    const QString outputPath = app.arguments().value(1);
+    if (outputPath.isEmpty())
+        return EXIT_FAILURE;
 
     qmlRegisterUncreatableMetaObject(
         Aurora::staticMetaObject,
@@ -50,5 +55,18 @@ int main(int argc, char *argv[])
         Qt::QueuedConnection);
 
     engine.loadFromModule("Aurora.App", "Main");
+
+    QTimer::singleShot(800, &app, [&app, &engine, outputPath]() {
+        QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().value(0));
+        if (!window)
+            QCoreApplication::exit(EXIT_FAILURE);
+
+        const QImage image = window->grabWindow();
+        if (image.isNull() || !image.save(outputPath))
+            QCoreApplication::exit(EXIT_FAILURE);
+
+        QCoreApplication::exit(EXIT_SUCCESS);
+    });
+
     return app.exec();
 }

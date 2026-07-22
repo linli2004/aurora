@@ -10,7 +10,7 @@ Window {
     minimumHeight: 640
     visible: true
     color: AuroraTokens.windowBackground
-    title: "Aurora Music Framework — Prototype 0.5.2"
+    title: "Aurora Music Framework — Prototype 0.5.3"
 
     AppShell { anchors.fill: parent }
 }

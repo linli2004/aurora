@@ -2,6 +2,7 @@
 
 The first target-Ubuntu run should generate and review at least:
 
+- `AUR-013_handoff_home.png`
 - `AuroraCore.Idle.Home.Normal.Balanced`
 - `AuroraCore.PlayingCalm.MusicSpace.Normal.Balanced`
 - `AuroraMoment.Present.Home.Normal.Balanced`

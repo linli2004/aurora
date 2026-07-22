@@ -30,7 +30,7 @@ Item {
         reactiveEnabled ? Math.max(0, Math.min(1, midEnergy)) : 0.0
     readonly property real high:
         reactiveEnabled ? Math.max(0, Math.min(1, highEnergy)) : 0.0
-    readonly property real transientLevel:
+    readonly property real transientEnergyLevel:
         reactiveEnabled ? Math.max(0, Math.min(1, transientEnergy)) : 0.0
     readonly property real presence:
         Math.max(0.0, Math.min(1.0, presenceLevel + level * 0.30))
@@ -131,7 +131,7 @@ Item {
                            root.primaryColor.g * 0.72 + root.secondaryColor.g * 0.28,
                            root.primaryColor.b * 0.72 + root.secondaryColor.b * 0.28,
                            0.022 + root.presence * 0.050 + root.high * 0.040)
-            scale: 1.0 + root.high * 0.09 + root.transientLevel * 0.045
+            scale: 1.0 + root.high * 0.09 + root.transientEnergyLevel * 0.045
             transformOrigin: Item.Center
         }
     }
@@ -148,7 +148,7 @@ Item {
                        root.primaryColor.g,
                        root.primaryColor.b,
                        0.018 + root.presence * 0.040 + root.bass * 0.025)
-        scale: 1.0 + root.transientLevel * 0.05
+        scale: 1.0 + root.transientEnergyLevel * 0.05
     }
 
     Repeater {
@@ -167,11 +167,11 @@ Item {
             border.color: Qt.rgba(root.primaryColor.r,
                                   root.primaryColor.g,
                                   root.primaryColor.b,
-                                  0.025 + root.transientLevel * (0.08 - index * 0.012))
+                                  0.025 + root.transientEnergyLevel * (0.08 - index * 0.012))
             opacity: root.reactiveEnabled
                      ? 0.35 + root.level * 0.22 - index * 0.06
                      : 0.0
-            scale: 1.0 + root.transientLevel * (0.13 + index * 0.055)
+            scale: 1.0 + root.transientEnergyLevel * (0.13 + index * 0.055)
         }
     }
 
@@ -200,7 +200,7 @@ Item {
                - height / 2
             color: index % 3 === 0 ? root.secondaryColor : root.primaryColor
             opacity: 0.035 + root.presence * 0.10 + root.high * 0.28
-            scale: 0.85 + root.high * 0.65 + root.transientLevel * 0.45
+            scale: 0.85 + root.high * 0.65 + root.transientEnergyLevel * 0.45
             transformOrigin: Item.Center
         }
     }
