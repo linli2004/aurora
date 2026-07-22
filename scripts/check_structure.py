@@ -21,6 +21,10 @@ REQUIRED = [
     "runtime/audio/AudioRuntime.cpp",
     "runtime/audio/LocalTrackIdentity.h",
     "runtime/audio/LocalTrackIdentity.cpp",
+    "runtime/library/LocalLibraryRepository.h",
+    "runtime/library/LocalLibraryRepository.cpp",
+    "runtime/library/LocalLibraryService.h",
+    "runtime/library/LocalLibraryService.cpp",
     "qml/Main.qml",
     "qml/AuroraTokens.qml",
     "qml/AudioDiagnostics.qml",
@@ -37,6 +41,7 @@ REQUIRED = [
     "tests/test_audio_queue.cpp",
     "tests/test_audio_feature_analyzer.cpp",
     "tests/test_local_track_identity.cpp",
+    "tests/test_local_library_repository.cpp",
     "docs/engineering/MVP_v0.1.md",
     "docs/engineering/ARCHITECTURE.md",
 ]

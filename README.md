@@ -22,6 +22,8 @@ Implemented as an initial scaffold:
 - Play, pause, previous, next, seeking, volume and error states
 - Local metadata title, artist, album and track number resolution
 - Stable local Track ID, path-scoped Source ID, canonical title and availability fields
+- SQLite-backed local library repository with Track / TrackSource persistence
+- Recursive local folder scan for supported audio files
 - Embedded artwork extraction with a trusted Generated Identity fallback
 - Decoded-audio feature analysis for level, bass, mid, high and transient presence
 - Audio-reactive Atmosphere with Reduced Motion and Eco fallbacks
@@ -32,7 +34,7 @@ Implemented as an initial scaffold:
 
 Deferred:
 
-- Persistent metadata index and local library scanning
+- Full metadata index refinement and scanner cancellation/progress details
 - Emotion Graph and Intelligence Layer
 - Production Memory persistence
 - Online music providers

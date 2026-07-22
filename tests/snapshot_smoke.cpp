@@ -11,6 +11,7 @@
 #include "runtime/AuroraStateMapper.h"
 #include "runtime/AuroraTypes.h"
 #include "runtime/audio/AudioRuntime.h"
+#include "runtime/library/LocalLibraryService.h"
 
 int main(int argc, char *argv[])
 {
@@ -44,6 +45,15 @@ int main(int argc, char *argv[])
         "AudioRuntime",
         [](QQmlEngine *, QJSEngine *) -> QObject * {
             return new AudioRuntime;
+        });
+
+    qmlRegisterSingletonType<LocalLibraryService>(
+        "Aurora.Runtime",
+        1,
+        0,
+        "LocalLibrary",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new LocalLibraryService;
         });
 
     QQmlApplicationEngine engine;

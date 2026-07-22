@@ -101,6 +101,12 @@ Provenance
 
 # AUR-017 — Local Repository and Identity Persistence ADR
 
+Status:
+
+```text
+Accepted for Local Alpha implementation.
+```
+
 只做设计和 ADR：
 
 - Schema；
@@ -121,6 +127,12 @@ Provenance
 ---
 
 # AUR-018 — Local Library Scanner
+
+Status:
+
+```text
+Initial scanner/repository vertical slice implemented.
+```
 
 依赖 AUR-016、AUR-017。
 

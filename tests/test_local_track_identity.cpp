@@ -27,8 +27,8 @@ void LocalTrackIdentityTest::filenameFallbackPreservesUnicode()
     const QUrl source = QUrl::fromLocalFile(QStringLiteral("/tmp/失眠.flac"));
     const LocalTrackIdentity identity = LocalTrackIdentityResolver::fallbackFor(source);
 
-    QVERIFY(identity.trackId.startsWith(QStringLiteral("local-file:")));
-    QVERIFY(identity.sourceId.startsWith(QStringLiteral("local-file:")));
+    QVERIFY(identity.trackId.startsWith(QStringLiteral("track:provisional:v1:")));
+    QVERIFY(identity.sourceId.startsWith(QStringLiteral("source:local-file:v1:")));
     QCOMPARE(identity.filePath, QStringLiteral("/tmp/失眠.flac"));
     QCOMPARE(identity.canonicalTitle, QStringLiteral("失眠"));
     QCOMPARE(identity.title, QStringLiteral("失眠"));

@@ -10,6 +10,7 @@
 #include <QtGlobal>
 
 #include <cmath>
+#include <utility>
 
 namespace {
 QString defaultArtworkCacheRoot()
@@ -109,14 +110,19 @@ QString LocalTrackIdentityResolver::sourceIdForPath(const QString &filePath)
     const QByteArray digest = QCryptographicHash::hash(
         QStringLiteral("local-file-v1|").toUtf8() + filePath.toUtf8(),
         QCryptographicHash::Sha256);
-    return QStringLiteral("local-file:") + QString::fromLatin1(digest.toHex());
+    return QStringLiteral("source:local-file:v1:") + QString::fromLatin1(digest.toHex());
 }
 
 QString LocalTrackIdentityResolver::trackIdForFile(const QString &filePath, const QString &sourceId)
 {
     QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly))
-        return sourceId;
+    if (!file.open(QIODevice::ReadOnly)) {
+        const QString sourcePrefix = QStringLiteral("source:local-file:v1:");
+        const QString sourceHash = sourceId.startsWith(sourcePrefix)
+            ? sourceId.mid(sourcePrefix.size())
+            : sourceId;
+        return QStringLiteral("track:provisional:v1:") + sourceHash;
+    }
 
     constexpr qint64 sampleSize = 64 * 1024;
     const qint64 fileSize = file.size();
@@ -133,7 +139,7 @@ QString LocalTrackIdentityResolver::trackIdForFile(const QString &filePath, cons
         hash.addData(file.read(sampleSize));
     }
 
-    return QStringLiteral("local-track:") + QString::fromLatin1(hash.result().toHex());
+    return QStringLiteral("track:local-content:v1:") + QString::fromLatin1(hash.result().toHex());
 }
 
 QString LocalTrackIdentityResolver::normalizedText(const QString &value)

@@ -90,11 +90,17 @@ Reduced Motion 仍需后续任务验证。
 
 ---
 
-# 3. 尚未实现
+# 3. 部分实现与尚未实现
 
-- 本地音乐库扫描与索引；
-- SQLite 持久化；
-- 稳定 Track ID；
+## 部分实现
+
+- 稳定 Track ID 已具备 Local Alpha v0.1 契约；
+- 本地音乐库扫描与 SQLite 持久化已具备第一条纵切；
+- Local Library Alpha 仍缺少取消、详细进度、metadata index refinement、
+  delete/relink 和持久队列。
+
+## 尚未实现
+
 - 播放队列持久化；
 - 收藏、最近播放和设置；
 - MPRIS 系统媒体控制；

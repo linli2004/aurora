@@ -2,6 +2,10 @@
 
 ## Unreleased — Stable Local Track Identity
 
+- Added the first SQLite-backed local library repository with Track and TrackSource tables.
+- Added recursive local folder scanning for supported audio files.
+- Added a Music Space library panel for scanning a folder and loading scanned sources into the queue.
+- Added repository tests for schema creation, TrackSource persistence and duplicate content.
 - Added stable local Track ID generation from bounded file-content sampling.
 - Added path-scoped Source ID, canonical title, file path and availability fields.
 - Exposed local identity fields through the C++ audio runtime as read-only QML properties.

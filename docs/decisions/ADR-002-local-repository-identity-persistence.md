@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed for AUR-017 review.
+Accepted for Local Alpha implementation.
 
 ## Date
 
@@ -97,9 +97,8 @@ track:provisional:v1:<source-hash>
 source:local-file:v1:<path-hash>
 ```
 
-AUR-016 code currently emits `local-track:` and `local-file:` strings. The first
-SQLite implementation should normalize those into the repository namespaces
-above at write time or update the runtime before persistence starts.
+AUR-018 updates the runtime identity namespaces before repository persistence
+starts.
 
 ## Algorithm Versioning
 

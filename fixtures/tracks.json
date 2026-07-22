@@ -3,8 +3,8 @@
   "tracks": [
     {
       "id": "track-quiet-signals",
-      "trackId": "local-track:fixture-quiet-signals",
-      "sourceId": "local-fixture:quiet-signals",
+      "trackId": "track:local-content:v1:fixture-quiet-signals",
+      "sourceId": "source:local-file:v1:quiet-signals",
       "filePath": "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png",
       "canonicalTitle": "quiet signals",
       "title": "Quiet Signals",

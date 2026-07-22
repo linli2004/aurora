@@ -26,8 +26,8 @@ or scanner.
 - Renaming or moving the same file preserves `trackId`.
 - Copying duplicate file content preserves `trackId` while producing a different
   `sourceId`.
-- Missing files remain representable as unavailable fallback identities; their
-  `trackId` falls back to the path-scoped `sourceId` until content is available.
+- Missing files remain representable as unavailable fallback identities through
+  the `track:provisional:v1:` namespace until content is available.
 
 ## Stability guarantees
 

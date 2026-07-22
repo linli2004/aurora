@@ -76,6 +76,11 @@ Item {
             event.accepted = true
             return
         }
+        if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_L) {
+            libraryDialog.open()
+            event.accepted = true
+            return
+        }
         if (event.key === Qt.Key_D
                 && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
             root.diagnosticsVisible = !root.diagnosticsVisible
@@ -103,6 +108,12 @@ Item {
             "All files (*)"
         ]
         onAccepted: AudioRuntime.setQueue(selectedFiles)
+    }
+
+    FolderDialog {
+        id: libraryDialog
+        title: "Choose music folder"
+        onAccepted: LocalLibrary.scanDirectory(selectedFolder)
     }
 
     AtmosphereField {
@@ -270,6 +281,99 @@ Item {
         }
 
         TapHandler { onTapped: audioDialog.open() }
+    }
+
+    Rectangle {
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.leftMargin: 28
+        anchors.topMargin: 82
+        width: 236
+        height: 106
+        radius: 8
+        color: Qt.rgba(1, 1, 1, 0.055)
+        border.width: 1
+        border.color: Qt.rgba(1, 1, 1, 0.10)
+
+        Column {
+            anchors.fill: parent
+            anchors.margins: 14
+            spacing: 10
+
+            Text {
+                width: parent.width
+                text: LocalLibrary.scanning
+                      ? "Scanning library"
+                      : "Library · " + LocalLibrary.trackCount + " tracks"
+                color: AuroraTokens.textSecondary
+                font.pixelSize: 13
+                elide: Text.ElideRight
+            }
+
+            Text {
+                width: parent.width
+                text: LocalLibrary.lastScanStatus.length > 0
+                      ? LocalLibrary.lastScanStatus
+                      : "No folder scanned"
+                color: LocalLibrary.errorString.length > 0
+                       ? AuroraTokens.warmAccent
+                       : AuroraTokens.textMuted
+                font.pixelSize: 11
+                elide: Text.ElideRight
+            }
+
+            Row {
+                spacing: 8
+
+                Rectangle {
+                    width: 96
+                    height: 30
+                    radius: 15
+                    color: LocalLibrary.scanning
+                           ? Qt.rgba(1, 1, 1, 0.045)
+                           : Qt.rgba(1, 1, 1, 0.08)
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, 0.10)
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: LocalLibrary.scanning ? "Scanning" : "Scan folder"
+                        color: AuroraTokens.textSecondary
+                        font.pixelSize: 11
+                    }
+
+                    TapHandler {
+                        enabled: !LocalLibrary.scanning
+                        onTapped: libraryDialog.open()
+                    }
+                }
+
+                Rectangle {
+                    width: 96
+                    height: 30
+                    radius: 15
+                    color: LocalLibrary.sourceCount > 0
+                           ? Qt.rgba(root.displayIdentityColor.r,
+                                     root.displayIdentityColor.g,
+                                     root.displayIdentityColor.b, 0.16)
+                           : Qt.rgba(1, 1, 1, 0.045)
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, 0.10)
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Play library"
+                        color: AuroraTokens.textSecondary
+                        font.pixelSize: 11
+                    }
+
+                    TapHandler {
+                        enabled: LocalLibrary.sourceCount > 0
+                        onTapped: AudioRuntime.setQueue(LocalLibrary.playableUrls())
+                    }
+                }
+            }
+        }
     }
 
     AudioDiagnostics {

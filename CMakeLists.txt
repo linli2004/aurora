@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick Multimedia)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick Multimedia Sql)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
@@ -27,6 +27,10 @@ qt_add_executable(aurora
     runtime/audio/AudioRuntime.h
     runtime/audio/LocalTrackIdentity.cpp
     runtime/audio/LocalTrackIdentity.h
+    runtime/library/LocalLibraryRepository.cpp
+    runtime/library/LocalLibraryRepository.h
+    runtime/library/LocalLibraryService.cpp
+    runtime/library/LocalLibraryService.h
 )
 
 set(AURORA_QML_FILES
@@ -88,6 +92,7 @@ target_link_libraries(aurora PRIVATE
     Qt6::Qml
     Qt6::Quick
     Qt6::Multimedia
+    Qt6::Sql
 )
 
 set_target_properties(aurora PROPERTIES
@@ -133,6 +138,23 @@ if(BUILD_TESTING)
     )
     add_test(NAME aurora.local_track_identity COMMAND aurora_local_track_identity_tests)
 
+    qt_add_executable(aurora_local_library_repository_tests
+        tests/test_local_library_repository.cpp
+        runtime/audio/LocalTrackIdentity.cpp
+        runtime/audio/LocalTrackIdentity.h
+        runtime/library/LocalLibraryRepository.cpp
+        runtime/library/LocalLibraryRepository.h
+    )
+    target_include_directories(aurora_local_library_repository_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(aurora_local_library_repository_tests PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Multimedia
+        Qt6::Sql
+        Qt6::Test
+    )
+    add_test(NAME aurora.local_library_repository COMMAND aurora_local_library_repository_tests)
+
     qt_add_executable(aurora_audio_feature_tests
         tests/test_audio_feature_analyzer.cpp
         runtime/audio/AudioFeatureAnalyzer.cpp
@@ -159,6 +181,10 @@ if(BUILD_TESTING)
         runtime/audio/AudioRuntime.h
         runtime/audio/LocalTrackIdentity.cpp
         runtime/audio/LocalTrackIdentity.h
+        runtime/library/LocalLibraryRepository.cpp
+        runtime/library/LocalLibraryRepository.h
+        runtime/library/LocalLibraryService.cpp
+        runtime/library/LocalLibraryService.h
     )
     set_target_properties(aurora_snapshot_smoke PROPERTIES
         QT_QML_MODULE_NO_IMPORT_SCAN TRUE
@@ -170,6 +196,7 @@ if(BUILD_TESTING)
         Qt6::Qml
         Qt6::Quick
         Qt6::Multimedia
+        Qt6::Sql
     )
     qt_add_qml_module(aurora_snapshot_smoke
         URI Aurora.App
