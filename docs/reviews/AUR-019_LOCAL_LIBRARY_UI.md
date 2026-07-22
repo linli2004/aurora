@@ -10,7 +10,7 @@ AUR-019 adds the first browseable local library surface:
 
 - repository-backed `LocalLibraryTrackModel`;
 - search command and visible result count on `LocalLibraryService`;
-- Music Space Tracks panel;
+- button-expanded Music Space Tracks panel;
 - click-to-play queue creation from the selected row;
 - scan progress and cancellation.
 
@@ -25,7 +25,8 @@ queries, track model data and playback queue resolution.
   path hints.
 - Metadata indexing is still minimal.
 - Albums, recent playback, favorites and delete/relink commands are deferred.
-- The panel is desktop-oriented and hidden on narrow viewports.
+- The Tracks browser is button-expanded and desktop-oriented; it is hidden on
+  narrow viewports.
 
 ## Validation
 

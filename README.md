@@ -25,7 +25,7 @@ Implemented as an initial scaffold:
 - SQLite-backed local library repository with Track / TrackSource persistence
 - Recursive local folder scan for supported audio files
 - Scanner progress, cancellation and repository-backed track list refresh
-- Local library Tracks browser with search and click-to-play queue creation
+- Button-expanded local library browser with search and click-to-play queue creation
 - Minimal playback session restore for queue, current index and volume
 - Embedded artwork extraction with a trusted Generated Identity fallback
 - Decoded-audio feature analysis for level, bass, mid, high and transient presence
@@ -85,10 +85,10 @@ cmake --build --preset dev
 ## Local Library Demo Flow
 
 1. Open a Moment and enter Music Space.
-2. Press `Ctrl+L` or select **Scan folder**.
+2. Press `Ctrl+L` or open **Library** and select **Scan folder**.
 3. Choose a local music directory and watch the scan count update.
 4. Use **Cancel** during a long scan if needed.
-5. Search the Tracks panel, click a row to play from that track, or select **Play list**.
+5. Open **Tracks**, search the library, click a row to play from that track, or select **Play list**.
 6. Restart Aurora and confirm the last queue, current track and volume return without autoplay.
 
 ## Run Tests
