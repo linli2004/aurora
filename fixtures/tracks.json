@@ -3,10 +3,16 @@
   "tracks": [
     {
       "id": "track-quiet-signals",
+      "trackId": "local-track:fixture-quiet-signals",
+      "sourceId": "local-fixture:quiet-signals",
+      "filePath": "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png",
+      "canonicalTitle": "quiet signals",
       "title": "Quiet Signals",
       "artist": "Aurora Demo",
       "album": "Initial Light",
+      "durationMs": 0,
       "artwork": "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png",
+      "availability": "Available",
       "spatialCharacter": "Wide",
       "identitySignature": {
         "artworkAnchor": {

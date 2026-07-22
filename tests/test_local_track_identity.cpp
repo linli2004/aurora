@@ -1,6 +1,7 @@
 #include <QtTest>
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QImage>
 #include <QMediaMetaData>
@@ -15,6 +16,8 @@ class LocalTrackIdentityTest final : public QObject
 
 private slots:
     void filenameFallbackPreservesUnicode();
+    void trackIdSurvivesRenameAndMove();
+    void duplicateContentSharesTrackIdButNotSourceId();
     void resolvesEmbeddedMetadataAndArtwork();
     void prefersTrackArtistOverAlbumArtist();
 };
@@ -24,11 +27,65 @@ void LocalTrackIdentityTest::filenameFallbackPreservesUnicode()
     const QUrl source = QUrl::fromLocalFile(QStringLiteral("/tmp/失眠.flac"));
     const LocalTrackIdentity identity = LocalTrackIdentityResolver::fallbackFor(source);
 
+    QVERIFY(identity.trackId.startsWith(QStringLiteral("local-file:")));
+    QVERIFY(identity.sourceId.startsWith(QStringLiteral("local-file:")));
+    QCOMPARE(identity.filePath, QStringLiteral("/tmp/失眠.flac"));
+    QCOMPARE(identity.canonicalTitle, QStringLiteral("失眠"));
     QCOMPARE(identity.title, QStringLiteral("失眠"));
     QCOMPARE(identity.artist, QStringLiteral("Local audio"));
+    QCOMPARE(identity.availability, QStringLiteral("Unavailable"));
     QVERIFY(identity.artworkSource.isEmpty());
     QVERIFY(!identity.metadataAvailable);
     QCOMPARE(identity.provenance, QStringLiteral("Filename fallback · Generated identity"));
+}
+
+void LocalTrackIdentityTest::trackIdSurvivesRenameAndMove()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString firstPath = directory.filePath(QStringLiteral("first-name.flac"));
+    const QString secondPath = directory.filePath(QStringLiteral("renamed.flac"));
+
+    QFile file(firstPath);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("stable content fixture");
+    file.close();
+
+    const LocalTrackIdentity first = LocalTrackIdentityResolver::fallbackFor(
+        QUrl::fromLocalFile(firstPath));
+
+    QVERIFY(QFile::rename(firstPath, secondPath));
+
+    const LocalTrackIdentity second = LocalTrackIdentityResolver::fallbackFor(
+        QUrl::fromLocalFile(secondPath));
+
+    QCOMPARE(first.trackId, second.trackId);
+    QVERIFY(first.sourceId != second.sourceId);
+    QCOMPARE(second.availability, QStringLiteral("Available"));
+}
+
+void LocalTrackIdentityTest::duplicateContentSharesTrackIdButNotSourceId()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString firstPath = directory.filePath(QStringLiteral("a.ogg"));
+    const QString secondPath = directory.filePath(QStringLiteral("b.ogg"));
+
+    QFile firstFile(firstPath);
+    QVERIFY(firstFile.open(QIODevice::WriteOnly));
+    firstFile.write("duplicate audio fixture");
+    firstFile.close();
+    QVERIFY(QFile::copy(firstPath, secondPath));
+
+    const LocalTrackIdentity first = LocalTrackIdentityResolver::fallbackFor(
+        QUrl::fromLocalFile(firstPath));
+    const LocalTrackIdentity second = LocalTrackIdentityResolver::fallbackFor(
+        QUrl::fromLocalFile(secondPath));
+
+    QCOMPARE(first.trackId, second.trackId);
+    QVERIFY(first.sourceId != second.sourceId);
 }
 
 void LocalTrackIdentityTest::resolvesEmbeddedMetadataAndArtwork()
@@ -59,9 +116,11 @@ void LocalTrackIdentityTest::resolvesEmbeddedMetadataAndArtwork()
         cacheDirectory.path());
 
     QCOMPARE(identity.title, QStringLiteral("Midnight Signal"));
+    QCOMPARE(identity.canonicalTitle, QStringLiteral("midnight signal"));
     QCOMPARE(identity.artist, QStringLiteral("Lin, Aurora"));
     QCOMPARE(identity.album, QStringLiteral("Night Rooms"));
     QCOMPARE(identity.trackNumber, 4);
+    QCOMPARE(identity.availability, QStringLiteral("Available"));
     QVERIFY(identity.metadataAvailable);
     QVERIFY(identity.hasEmbeddedArtwork);
     QVERIFY(identity.identityColor.isValid());

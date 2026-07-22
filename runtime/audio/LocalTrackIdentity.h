@@ -10,6 +10,10 @@
 
 struct LocalTrackIdentity
 {
+    QString trackId;
+    QString sourceId;
+    QString filePath;
+    QString canonicalTitle;
     QString title;
     QString artist;
     QString album;
@@ -18,6 +22,7 @@ struct LocalTrackIdentity
     QColor identityColor;
     bool hasEmbeddedArtwork = false;
     bool metadataAvailable = false;
+    QString availability;
     QString provenance;
 
     [[nodiscard]] bool operator==(const LocalTrackIdentity &other) const = default;
@@ -33,6 +38,9 @@ public:
         const QString &artworkCacheRoot = {});
 
 private:
+    [[nodiscard]] static QString canonicalFilePath(const QUrl &source);
+    [[nodiscard]] static QString sourceIdForPath(const QString &filePath);
+    [[nodiscard]] static QString trackIdForFile(const QString &filePath, const QString &sourceId);
     [[nodiscard]] static QString normalizedText(const QString &value);
     [[nodiscard]] static QString firstMetadataText(
         const QMediaMetaData &metaData,

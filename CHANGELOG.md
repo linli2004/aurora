@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Stable Local Track Identity
+
+- Added stable local Track ID generation from bounded file-content sampling.
+- Added path-scoped Source ID, canonical title, file path and availability fields.
+- Exposed local identity fields through the C++ audio runtime as read-only QML properties.
+- Updated track fixtures and validation for the Local Library Alpha identity contract.
+- Added regression tests for rename/move stability, duplicate content and unavailable fallback identity.
+
 ## 0.5.3 — Progressive Carousel Identity Handoff
 
 - Slow the default track transition from 780 ms to 1450 ms so identity change is perceptible instead of feeling like a cut.

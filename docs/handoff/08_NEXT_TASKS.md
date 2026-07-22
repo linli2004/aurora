@@ -66,6 +66,12 @@ current UX recorded
 
 # AUR-016 — Stable Track Identity
 
+Status:
+
+```text
+Implemented in local development after AUR-013.
+```
+
 在音乐库之前冻结：
 
 ```text

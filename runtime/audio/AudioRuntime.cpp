@@ -59,6 +59,26 @@ QUrl AudioRuntime::source() const
     return m_player.source();
 }
 
+QString AudioRuntime::trackId() const
+{
+    return m_trackIdentity.trackId;
+}
+
+QString AudioRuntime::sourceId() const
+{
+    return m_trackIdentity.sourceId;
+}
+
+QString AudioRuntime::filePath() const
+{
+    return m_trackIdentity.filePath;
+}
+
+QString AudioRuntime::canonicalTitle() const
+{
+    return m_trackIdentity.canonicalTitle;
+}
+
 QString AudioRuntime::title() const
 {
     return m_trackIdentity.title;
@@ -102,6 +122,11 @@ bool AudioRuntime::hasEmbeddedArtwork() const
 bool AudioRuntime::metadataAvailable() const
 {
     return m_trackIdentity.metadataAvailable;
+}
+
+QString AudioRuntime::availability() const
+{
+    return m_trackIdentity.availability;
 }
 
 QString AudioRuntime::identityProvenance() const

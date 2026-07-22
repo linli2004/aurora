@@ -21,6 +21,7 @@ Implemented as an initial scaffold:
 - Native multi-file selection and an in-memory playback queue
 - Play, pause, previous, next, seeking, volume and error states
 - Local metadata title, artist, album and track number resolution
+- Stable local Track ID, path-scoped Source ID, canonical title and availability fields
 - Embedded artwork extraction with a trusted Generated Identity fallback
 - Decoded-audio feature analysis for level, bass, mid, high and transient presence
 - Audio-reactive Atmosphere with Reduced Motion and Eco fallbacks

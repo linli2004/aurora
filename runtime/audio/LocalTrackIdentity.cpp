@@ -3,6 +3,7 @@
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QImage>
 #include <QStandardPaths>
@@ -23,11 +24,19 @@ QString defaultArtworkCacheRoot()
 LocalTrackIdentity LocalTrackIdentityResolver::fallbackFor(const QUrl &source)
 {
     LocalTrackIdentity identity;
-    const QFileInfo fileInfo(source.toLocalFile());
+    const QString resolvedPath = canonicalFilePath(source);
+    const QFileInfo fileInfo(resolvedPath);
+    identity.filePath = resolvedPath;
+    identity.sourceId = sourceIdForPath(resolvedPath);
+    identity.trackId = trackIdForFile(resolvedPath, identity.sourceId);
     identity.title = normalizedText(fileInfo.completeBaseName());
     if (identity.title.isEmpty())
         identity.title = QStringLiteral("Unknown track");
+    identity.canonicalTitle = identity.title.toCaseFolded();
     identity.artist = QStringLiteral("Local audio");
+    identity.availability = fileInfo.exists() && fileInfo.isFile() && fileInfo.isReadable()
+        ? QStringLiteral("Available")
+        : QStringLiteral("Unavailable");
     identity.provenance = QStringLiteral("Filename fallback · Generated identity");
     return identity;
 }
@@ -42,6 +51,7 @@ LocalTrackIdentity LocalTrackIdentityResolver::resolve(
     const QString metadataTitle = normalizedText(metaData.stringValue(QMediaMetaData::Title));
     if (!metadataTitle.isEmpty())
         identity.title = metadataTitle;
+    identity.canonicalTitle = identity.title.toCaseFolded();
 
     const QString metadataArtist = firstMetadataText(
         metaData,
@@ -76,6 +86,54 @@ LocalTrackIdentity LocalTrackIdentityResolver::resolve(
         identity.provenance = QStringLiteral("Local metadata · Generated identity");
 
     return identity;
+}
+
+QString LocalTrackIdentityResolver::canonicalFilePath(const QUrl &source)
+{
+    if (!source.isLocalFile())
+        return {};
+
+    const QFileInfo fileInfo(source.toLocalFile());
+    const QString canonicalPath = fileInfo.canonicalFilePath();
+    if (!canonicalPath.isEmpty())
+        return QDir::cleanPath(canonicalPath);
+
+    return QDir::cleanPath(fileInfo.absoluteFilePath());
+}
+
+QString LocalTrackIdentityResolver::sourceIdForPath(const QString &filePath)
+{
+    if (filePath.isEmpty())
+        return {};
+
+    const QByteArray digest = QCryptographicHash::hash(
+        QStringLiteral("local-file-v1|").toUtf8() + filePath.toUtf8(),
+        QCryptographicHash::Sha256);
+    return QStringLiteral("local-file:") + QString::fromLatin1(digest.toHex());
+}
+
+QString LocalTrackIdentityResolver::trackIdForFile(const QString &filePath, const QString &sourceId)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly))
+        return sourceId;
+
+    constexpr qint64 sampleSize = 64 * 1024;
+    const qint64 fileSize = file.size();
+
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    hash.addData("local-track-v1|");
+    hash.addData(QByteArray::number(fileSize));
+    hash.addData("|");
+    hash.addData(file.read(sampleSize));
+
+    if (fileSize > sampleSize) {
+        file.seek(qMax<qint64>(0, fileSize - sampleSize));
+        hash.addData("|");
+        hash.addData(file.read(sampleSize));
+    }
+
+    return QStringLiteral("local-track:") + QString::fromLatin1(hash.result().toHex());
 }
 
 QString LocalTrackIdentityResolver::normalizedText(const QString &value)

@@ -42,6 +42,22 @@ def main() -> None:
 
     track_ids = {track["id"] for track in tracks["tracks"]}
     for track in tracks["tracks"]:
+        for key in (
+            "trackId",
+            "sourceId",
+            "filePath",
+            "canonicalTitle",
+            "durationMs",
+            "artwork",
+            "availability",
+        ):
+            require(key in track, f"track {track['id']} missing {key}")
+        require(track["trackId"], f"track {track['id']} needs trackId")
+        require(track["sourceId"], f"track {track['id']} needs sourceId")
+        require(track["canonicalTitle"] == track["title"].casefold(),
+                f"track {track['id']} canonicalTitle must match title casefold")
+        require(track["availability"] in {"Available", "Unavailable", "Detached"},
+                f"track {track['id']} has invalid availability")
         validate_provenance(track["provenance"], f"track {track['id']}")
         signature = track.get("identitySignature", {})
         require("artworkAnchor" in signature, f"track {track['id']} needs artworkAnchor")

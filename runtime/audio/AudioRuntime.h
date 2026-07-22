@@ -17,6 +17,10 @@ class AudioRuntime final : public QObject
     Q_OBJECT
 
     Q_PROPERTY(QUrl source READ source NOTIFY sourceChanged)
+    Q_PROPERTY(QString trackId READ trackId NOTIFY trackChanged)
+    Q_PROPERTY(QString sourceId READ sourceId NOTIFY trackChanged)
+    Q_PROPERTY(QString filePath READ filePath NOTIFY trackChanged)
+    Q_PROPERTY(QString canonicalTitle READ canonicalTitle NOTIFY trackChanged)
     Q_PROPERTY(QString title READ title NOTIFY trackChanged)
     Q_PROPERTY(QString artist READ artist NOTIFY trackChanged)
     Q_PROPERTY(QString album READ album NOTIFY trackChanged)
@@ -26,6 +30,7 @@ class AudioRuntime final : public QObject
     Q_PROPERTY(bool identityColorAvailable READ identityColorAvailable NOTIFY trackChanged)
     Q_PROPERTY(bool hasEmbeddedArtwork READ hasEmbeddedArtwork NOTIFY trackChanged)
     Q_PROPERTY(bool metadataAvailable READ metadataAvailable NOTIFY trackChanged)
+    Q_PROPERTY(QString availability READ availability NOTIFY trackChanged)
     Q_PROPERTY(QString identityProvenance READ identityProvenance NOTIFY trackChanged)
     Q_PROPERTY(qint64 duration READ duration NOTIFY durationChanged)
     Q_PROPERTY(qint64 position READ position WRITE setPosition NOTIFY positionChanged)
@@ -49,6 +54,10 @@ public:
     explicit AudioRuntime(QObject *parent = nullptr);
 
     [[nodiscard]] QUrl source() const;
+    [[nodiscard]] QString trackId() const;
+    [[nodiscard]] QString sourceId() const;
+    [[nodiscard]] QString filePath() const;
+    [[nodiscard]] QString canonicalTitle() const;
     [[nodiscard]] QString title() const;
     [[nodiscard]] QString artist() const;
     [[nodiscard]] QString album() const;
@@ -58,6 +67,7 @@ public:
     [[nodiscard]] bool identityColorAvailable() const;
     [[nodiscard]] bool hasEmbeddedArtwork() const;
     [[nodiscard]] bool metadataAvailable() const;
+    [[nodiscard]] QString availability() const;
     [[nodiscard]] QString identityProvenance() const;
     [[nodiscard]] qint64 duration() const;
     [[nodiscard]] qint64 position() const;
