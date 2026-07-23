@@ -115,6 +115,7 @@ void LocalLibraryRepositoryTest::persistsSettings()
         QVariantMap value;
         value.insert(QStringLiteral("currentIndex"), 2);
         value.insert(QStringLiteral("volume"), 0.5);
+        value.insert(QStringLiteral("positionMs"), 87234);
         QVERIFY2(repository.setSetting(QStringLiteral("playback.session.v1"), value),
                  qPrintable(repository.lastError()));
     }
@@ -124,6 +125,7 @@ void LocalLibraryRepositoryTest::persistsSettings()
     const QVariantMap value = repository.setting(QStringLiteral("playback.session.v1"));
     QCOMPARE(value.value(QStringLiteral("currentIndex")).toInt(), 2);
     QCOMPARE(value.value(QStringLiteral("volume")).toReal(), 0.5);
+    QCOMPARE(value.value(QStringLiteral("positionMs")).toLongLong(), 87234);
 }
 
 QTEST_GUILESS_MAIN(LocalLibraryRepositoryTest)
