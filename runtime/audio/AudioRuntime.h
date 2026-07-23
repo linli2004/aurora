@@ -7,6 +7,7 @@
 #include <QAudioBufferOutput>
 #include <QAudioOutput>
 #include <QMediaPlayer>
+#include <QTimer>
 
 #include "runtime/audio/AudioFeatureAnalyzer.h"
 #include "runtime/audio/AudioQueue.h"
@@ -52,6 +53,7 @@ class AudioRuntime final : public QObject
 
 public:
     explicit AudioRuntime(QObject *parent = nullptr);
+    ~AudioRuntime() override;
 
     [[nodiscard]] QUrl source() const;
     [[nodiscard]] QString trackId() const;
@@ -118,18 +120,24 @@ signals:
 
 private:
     QList<QUrl> validLocalFiles(const QList<QUrl> &urls) const;
-    void loadCurrent(bool autoplay);
+    void loadCurrent(bool autoplay, qint64 initialPosition = -1);
+    void applyPendingSessionPosition();
     void applyTrackIdentity(const LocalTrackIdentity &identity);
     void refreshTrackIdentity();
     void restoreSession();
     void persistSession();
+    void scheduleSessionPersist();
     void setErrorString(const QString &message);
 
     QMediaPlayer m_player;
     QAudioOutput m_audioOutput;
     QAudioBufferOutput m_audioBufferOutput;
     AudioFeatureAnalyzer m_featureAnalyzer;
+    QTimer m_sessionPersistTimer;
+    QTimer m_restorePositionTimer;
     AudioQueue m_queue;
     LocalTrackIdentity m_trackIdentity;
     QString m_errorString;
+    qint64 m_pendingRestorePosition = -1;
+    int m_restorePositionAttempts = 0;
 };

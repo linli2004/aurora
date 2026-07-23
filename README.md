@@ -26,7 +26,7 @@ Implemented as an initial scaffold:
 - Recursive local folder scan for supported audio files
 - Scanner progress, cancellation and repository-backed track list refresh
 - Button-expanded local library browser with search and click-to-play queue creation
-- Minimal playback session restore for queue, current index and volume
+- Playback session restore for queue, current index, volume and track position
 - Embedded artwork extraction with a trusted Generated Identity fallback
 - Decoded-audio feature analysis for level, bass, mid, high and transient presence
 - Audio-reactive Atmosphere with Reduced Motion and Eco fallbacks
@@ -38,7 +38,7 @@ Implemented as an initial scaffold:
 Deferred:
 
 - Full metadata index refinement, albums view and delete/relink commands
-- Full persistent queue state including position, scene and transition personality
+- Full persistent experience state including scene and transition personality
 - Emotion Graph and Intelligence Layer
 - Production Memory persistence
 - Online music providers
@@ -89,7 +89,7 @@ cmake --build --preset dev
 3. Choose a local music directory and watch the scan count update.
 4. Use **Cancel** during a long scan if needed.
 5. Open **Tracks**, search the library, click a row to play from that track, or select **Play list**.
-6. Restart Aurora and confirm the last queue, current track and volume return without autoplay.
+6. Play beyond the opening seconds, restart Aurora, and confirm the queue, current track, volume and position return without autoplay.
 
 ## Run Tests
 

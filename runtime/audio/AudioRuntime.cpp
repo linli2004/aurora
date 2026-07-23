@@ -40,6 +40,14 @@ AudioRuntime::AudioRuntime(QObject *parent)
     m_audioOutput.setVolume(0.72F);
     m_player.setAudioOutput(&m_audioOutput);
     m_player.setAudioBufferOutput(&m_audioBufferOutput);
+    m_sessionPersistTimer.setSingleShot(true);
+    m_sessionPersistTimer.setInterval(2000);
+    connect(&m_sessionPersistTimer, &QTimer::timeout,
+            this, &AudioRuntime::persistSession);
+    m_restorePositionTimer.setSingleShot(true);
+    m_restorePositionTimer.setInterval(150);
+    connect(&m_restorePositionTimer, &QTimer::timeout,
+            this, &AudioRuntime::applyPendingSessionPosition);
 
     connect(&m_audioBufferOutput, &QAudioBufferOutput::audioBufferReceived,
             &m_featureAnalyzer, &AudioFeatureAnalyzer::processBuffer);
@@ -49,9 +57,35 @@ AudioRuntime::AudioRuntime(QObject *parent)
             this, &AudioRuntime::audioReactiveAvailabilityChanged);
 
     connect(&m_player, &QMediaPlayer::sourceChanged, this, [this] { emit sourceChanged(); });
-    connect(&m_player, &QMediaPlayer::durationChanged, this, [this] { emit durationChanged(); });
-    connect(&m_player, &QMediaPlayer::positionChanged, this, [this] { emit positionChanged(); });
+    connect(&m_player, &QMediaPlayer::durationChanged, this, [this] {
+        emit durationChanged();
+        applyPendingSessionPosition();
+    });
+    connect(&m_player, &QMediaPlayer::positionChanged, this,
+            [this](qint64 currentPosition) {
+        emit positionChanged();
+
+        if (m_pendingRestorePosition >= 0) {
+            const qint64 target = qBound<qint64>(
+                0, m_pendingRestorePosition,
+                duration() > 0 ? duration() : m_pendingRestorePosition);
+
+            if (qAbs(currentPosition - target) <= 1500) {
+                m_pendingRestorePosition = -1;
+                m_restorePositionAttempts = 0;
+                m_restorePositionTimer.stop();
+            }
+            return;
+        }
+
+        scheduleSessionPersist();
+    });
     connect(&m_audioOutput, &QAudioOutput::volumeChanged, this, [this] { emit volumeChanged(); });
+    connect(&m_player, &QMediaPlayer::seekableChanged, this,
+            [this](bool seekable) {
+        if (seekable)
+            applyPendingSessionPosition();
+    });
     connect(&m_player, &QMediaPlayer::metaDataChanged, this, &AudioRuntime::refreshTrackIdentity);
 
     connect(&m_player, &QMediaPlayer::playbackStateChanged, this, [this] {
@@ -68,6 +102,7 @@ AudioRuntime::AudioRuntime(QObject *parent)
                 if (status == QMediaPlayer::LoadedMedia
                     || status == QMediaPlayer::BufferedMedia) {
                     refreshTrackIdentity();
+                applyPendingSessionPosition();
                 }
 
                 if (status == QMediaPlayer::EndOfMedia && m_queue.moveNext()) {
@@ -79,11 +114,19 @@ AudioRuntime::AudioRuntime(QObject *parent)
 
     connect(&m_player, &QMediaPlayer::errorOccurred, this,
             [this](QMediaPlayer::Error, const QString &message) {
+                m_restorePositionTimer.stop();
+                m_restorePositionAttempts = 0;
+                m_pendingRestorePosition = -1;
                 setErrorString(message.isEmpty() ? tr("Unable to play this audio file.") : message);
                 emit semanticStateChanged();
             });
 
     restoreSession();
+}
+
+AudioRuntime::~AudioRuntime()
+{
+    persistSession();
 }
 
 QUrl AudioRuntime::source() const
@@ -293,6 +336,10 @@ void AudioRuntime::appendFiles(const QVariantList &urls)
 
 void AudioRuntime::clearQueue()
 {
+    m_sessionPersistTimer.stop();
+    m_restorePositionTimer.stop();
+    m_restorePositionAttempts = 0;
+    m_pendingRestorePosition = -1;
     m_featureAnalyzer.reset();
     m_player.stop();
     m_player.setSource(QUrl());
@@ -318,6 +365,7 @@ void AudioRuntime::play()
 void AudioRuntime::pause()
 {
     m_player.pause();
+    persistSession();
 }
 
 void AudioRuntime::togglePlayback()
@@ -331,6 +379,7 @@ void AudioRuntime::togglePlayback()
 void AudioRuntime::stop()
 {
     m_player.stop();
+    persistSession();
 }
 
 void AudioRuntime::next()
@@ -385,12 +434,16 @@ QList<QUrl> AudioRuntime::validLocalFiles(const QList<QUrl> &urls) const
     return result;
 }
 
-void AudioRuntime::loadCurrent(bool autoplay)
+void AudioRuntime::loadCurrent(bool autoplay, qint64 initialPosition)
 {
     const QUrl url = m_queue.currentUrl();
     if (url.isEmpty())
         return;
 
+    m_sessionPersistTimer.stop();
+    m_restorePositionTimer.stop();
+    m_restorePositionAttempts = 0;
+    m_pendingRestorePosition = initialPosition;
     setErrorString({});
     m_featureAnalyzer.reset();
     m_player.stop();
@@ -400,6 +453,38 @@ void AudioRuntime::loadCurrent(bool autoplay)
 
     if (autoplay)
         m_player.play();
+}
+
+void AudioRuntime::applyPendingSessionPosition()
+{
+    if (m_pendingRestorePosition < 0)
+        return;
+
+    if (duration() <= 0 || !m_player.isSeekable())
+        return;
+
+    const qint64 restoredPosition = qBound<qint64>(
+        0, m_pendingRestorePosition, duration());
+
+    if (qAbs(position() - restoredPosition) <= 1500) {
+        m_pendingRestorePosition = -1;
+        m_restorePositionAttempts = 0;
+        m_restorePositionTimer.stop();
+        return;
+    }
+
+    if (m_restorePositionAttempts >= 20) {
+        m_pendingRestorePosition = -1;
+        m_restorePositionAttempts = 0;
+        m_restorePositionTimer.stop();
+        return;
+    }
+
+    ++m_restorePositionAttempts;
+    m_player.setPosition(restoredPosition);
+
+    if (m_pendingRestorePosition >= 0)
+        m_restorePositionTimer.start();
 }
 
 void AudioRuntime::restoreSession()
@@ -420,11 +505,15 @@ void AudioRuntime::restoreSession()
     m_queue.setUrls(urls);
     m_queue.moveTo(session.value(QStringLiteral("currentIndex"), 0).toInt());
     emit queueChanged();
-    loadCurrent(false);
+    loadCurrent(false, qMax<qint64>(
+        0, session.value(QStringLiteral("positionMs"), 0).toLongLong()));
 }
 
 void AudioRuntime::persistSession()
 {
+    m_sessionPersistTimer.stop();
+    if (m_pendingRestorePosition >= 0)
+        return;
     LocalLibraryRepository repository;
     if (!repository.open(libraryDatabasePath()))
         return;
@@ -438,7 +527,19 @@ void AudioRuntime::persistSession()
     session.insert(QStringLiteral("urls"), urls);
     session.insert(QStringLiteral("currentIndex"), m_queue.currentIndex());
     session.insert(QStringLiteral("volume"), m_audioOutput.volume());
+    session.insert(QStringLiteral("positionMs"), position());
     repository.setSetting(QStringLiteral("playback.session.v1"), session);
+}
+
+void AudioRuntime::scheduleSessionPersist()
+{
+    if (m_queue.isEmpty()
+        || m_pendingRestorePosition >= 0
+        || m_sessionPersistTimer.isActive()) {
+        return;
+    }
+
+    m_sessionPersistTimer.start();
 }
 
 void AudioRuntime::applyTrackIdentity(const LocalTrackIdentity &identity)

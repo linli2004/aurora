@@ -8,6 +8,11 @@
 - Added scan progress and cancellation controls for long local library scans.
 - Added a repository-backed Tracks browser with search and click-to-play behavior.
 - Added minimal playback session restore for queue URLs, current index and volume.
+- Added playback-position persistence to the existing `playback.session.v1` record.
+- Restore waits for media duration before applying the saved position and never autoplays.
+- Throttled position writes to avoid updating SQLite for every media-player position signal.
+- Fixed startup position restore to wait for seekable media and confirm the applied position.
+- Added bounded retry handling for multimedia backends that ignore the first seek request.
 - Added repository tests for schema creation, TrackSource persistence and duplicate content.
 - Added repository tests for track search and settings persistence.
 - Added stable local Track ID generation from bounded file-content sampling.
