@@ -33,6 +33,10 @@ Implemented as an initial scaffold:
 - Missing-source reconciliation with stable Track relink after file moves
 - Persistent local library roots with multi-folder Rescan all
 - Debounced automatic library refresh for remembered folders while Aurora is running
+- Presence-first Music Space demo: controls reveal on interaction and return to
+  a quiet music environment after idle
+- Demo Hero Crystal with restrained audio-reactive pulse, tilt and edge light
+- Moment-first Home entry with Component Gallery hidden from the default demo
 - Embedded artwork extraction with a trusted Generated Identity fallback
 - Decoded-audio feature analysis for level, bass, mid, high and transient presence
 - Audio-reactive Atmosphere with Reduced Motion and Eco fallbacks
@@ -76,6 +80,16 @@ cmake --build --preset dev
 ./build/dev/aurora
 ```
 
+## Aurora Demo Flow
+
+1. Open Aurora on Home and start from the latest Moment.
+2. Click the Moment to recall it into Music Space.
+3. Let Music Space settle into Presence Mode: Atmosphere, Hero Crystal, song
+   identity and a quiet Core remain visible.
+4. Move the mouse to reveal Control Mode, then wait for controls to retreat.
+5. Use **Keep moment** or press `K` while a local track is loaded.
+6. Return Home and confirm the latest Moment has become the entry point.
+
 ## First Flow Scene Run
 
 1. Open a Moment and enter Music Space.
@@ -84,10 +98,9 @@ cmake --build --preset dev
 4. Confirm that local metadata appears when available; songs without artwork should keep the trusted Generated Identity.
 5. Play the track and observe the Flow Scene respond to the music.
 6. Press `V` to compare `Scene: Flow` with the legacy `Scene: Field`.
-7. Press `D` to verify decoded audio data while the scene is active.
-8. Pause and confirm the atmosphere settles back to quiet.
-9. Select at least two files, then use Previous/Next to verify the Liquid Flow identity handoff.
-10. Use Shift+Left/Right for track changes; plain Left/Right still seeks by five seconds.
+7. Pause and confirm the atmosphere settles back to quiet.
+8. Select at least two files, then use Previous/Next to verify the Liquid Flow identity handoff.
+9. Use Shift+Left/Right for track changes; plain Left/Right still seeks by five seconds.
 
 ## Local Library Demo Flow
 
@@ -151,7 +164,3 @@ Use `docs/engineering/TASK_TEMPLATE.md` to create narrowly scoped AI tasks.
 ## Repository Status
 
 The source, fixtures and patch structure were validated in the generation environment. A real Qt 6.10 build and decoded-buffer behavior must be validated on the target Ubuntu system. Embedded artwork remains optional because Generated Identity is a supported production fallback.
-
-## Audio diagnostics
-
-In Music Space, click **Audio data** or press `D` to inspect live semantic audio features. The panel is a development aid and is hidden by default.

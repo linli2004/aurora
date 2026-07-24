@@ -13,15 +13,20 @@ class MomentRepositoryTest final : public QObject
 
 private slots:
     void keepsAndRestoresLatestMoment();
+    void storesMultipleMomentsNewestFirst();
+    void updatesConfirmedMeaningWithoutChangingIdentity();
     void resolvesRelinkedTrackSource();
     void keepsDetachedMemoryWhenSourceIsMissing();
 };
 
 namespace {
-MomentRecord sampleMoment(const QString &sourcePath)
+MomentRecord sampleMoment(
+    const QString &sourcePath,
+    const QString &momentId = QStringLiteral("moment:test"),
+    const QDateTime &createdAt = QDateTime::currentDateTimeUtc())
 {
     MomentRecord moment;
-    moment.momentId = QStringLiteral("moment:test");
+    moment.momentId = momentId;
     moment.trackId = QStringLiteral("track:test");
     moment.sourceId = QStringLiteral("source:test-old");
     moment.sourcePath = sourcePath;
@@ -31,7 +36,7 @@ MomentRecord sampleMoment(const QString &sourcePath)
     moment.artworkUrl = QStringLiteral("qrc:/artwork.png");
     moment.identityColor = QStringLiteral("#ff7c8fcf");
     moment.periodLabel = QStringLiteral("Late Night");
-    moment.createdAt = QDateTime::currentDateTimeUtc();
+    moment.createdAt = createdAt;
     return moment;
 }
 }
@@ -66,6 +71,70 @@ void MomentRepositoryTest::keepsAndRestoresLatestMoment()
     QCOMPARE(latest->title, QStringLiteral("Quiet Signals"));
     QCOMPARE(repository.resolvedPlayablePath(*latest),
              QFileInfo(audioPath).canonicalFilePath());
+}
+
+void MomentRepositoryTest::storesMultipleMomentsNewestFirst()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    MomentRepository repository(QStringLiteral("moment-test-order"));
+    QVERIFY(repository.open(
+        directory.filePath(QStringLiteral("library.sqlite"))));
+
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    MomentRecord older = sampleMoment(
+        directory.filePath(QStringLiteral("older.mp3")),
+        QStringLiteral("moment:older"),
+        now.addSecs(-60));
+    older.title = QStringLiteral("Older");
+
+    MomentRecord newer = sampleMoment(
+        directory.filePath(QStringLiteral("newer.mp3")),
+        QStringLiteral("moment:newer"),
+        now);
+    newer.title = QStringLiteral("Newer");
+
+    QVERIFY(repository.keepMoment(older));
+    QVERIFY(repository.keepMoment(newer));
+
+    const QList<MomentRecord> moments = repository.moments();
+    QCOMPARE(moments.size(), 2);
+    QCOMPARE(moments.at(0).momentId, QStringLiteral("moment:newer"));
+    QCOMPARE(moments.at(1).momentId, QStringLiteral("moment:older"));
+    QCOMPARE(repository.latestMoment()->momentId,
+             QStringLiteral("moment:newer"));
+}
+
+void MomentRepositoryTest::updatesConfirmedMeaningWithoutChangingIdentity()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    MomentRepository repository(QStringLiteral("moment-test-meaning"));
+    QVERIFY(repository.open(
+        directory.filePath(QStringLiteral("library.sqlite"))));
+
+    const MomentRecord original = sampleMoment(
+        directory.filePath(QStringLiteral("meaning.mp3")));
+    QVERIFY(repository.keepMoment(original));
+
+    QVERIFY(repository.updateConfirmedMeaning(
+        original.momentId,
+        QStringLiteral("The night finally became quiet.")));
+
+    const auto updated = repository.moment(original.momentId);
+    QVERIFY(updated.has_value());
+    QCOMPARE(updated->confirmedMeaning,
+             QStringLiteral("The night finally became quiet."));
+    QCOMPARE(updated->trackId, original.trackId);
+    QCOMPARE(updated->sourceId, original.sourceId);
+    QCOMPARE(updated->sourcePath, original.sourcePath);
+
+    QVERIFY(repository.updateConfirmedMeaning(original.momentId, QString()));
+    const auto cleared = repository.moment(original.momentId);
+    QVERIFY(cleared.has_value());
+    QCOMPARE(cleared->confirmedMeaning, QStringLiteral(""));
 }
 
 void MomentRepositoryTest::resolvesRelinkedTrackSource()

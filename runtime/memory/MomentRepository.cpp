@@ -29,6 +29,32 @@ QString nonNull(const QString &value)
 {
     return value.isNull() ? QStringLiteral("") : value;
 }
+
+MomentRecord readMoment(const QSqlQuery &query)
+{
+    MomentRecord moment;
+    moment.momentId = query.value(0).toString();
+    moment.trackId = query.value(1).toString();
+    moment.sourceId = query.value(2).toString();
+    moment.sourcePath = query.value(3).toString();
+    moment.title = query.value(4).toString();
+    moment.artist = query.value(5).toString();
+    moment.album = query.value(6).toString();
+    moment.artworkUrl = query.value(7).toString();
+    moment.identityColor = query.value(8).toString();
+    moment.periodLabel = query.value(9).toString();
+    moment.confirmedMeaning = query.value(10).toString();
+    moment.createdAt = QDateTime::fromString(
+        query.value(11).toString(), Qt::ISODateWithMs);
+    return moment;
+}
+
+QString momentProjection()
+{
+    return QStringLiteral(
+        "moment_id, track_id, source_id, source_path, title, artist, album, "
+        "artwork_url, identity_color, period_label, confirmed_meaning, created_at");
+}
 }
 
 MomentRepository::MomentRepository(QString connectionName)
@@ -50,7 +76,8 @@ MomentRepository::~MomentRepository()
 
 bool MomentRepository::open(const QString &databasePath)
 {
-    m_database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connectionName);
+    m_database = QSqlDatabase::addDatabase(
+        QStringLiteral("QSQLITE"), m_connectionName);
     m_database.setDatabaseName(databasePath);
 
     if (!m_database.open()) {
@@ -75,35 +102,53 @@ int MomentRepository::count() const
     return query.next() ? query.value(0).toInt() : 0;
 }
 
+QList<MomentRecord> MomentRepository::moments() const
+{
+    QList<MomentRecord> records;
+    QSqlQuery query(m_database);
+    const QString sql = QStringLiteral("SELECT ")
+        + momentProjection()
+        + QStringLiteral(
+            " FROM moments ORDER BY created_at DESC, rowid DESC");
+
+    if (!query.exec(sql))
+        return records;
+
+    while (query.next())
+        records.append(readMoment(query));
+    return records;
+}
+
+std::optional<MomentRecord> MomentRepository::moment(
+    const QString &momentId) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(
+        QStringLiteral("SELECT ")
+        + momentProjection()
+        + QStringLiteral(" FROM moments WHERE moment_id = ? LIMIT 1"));
+    query.addBindValue(momentId);
+
+    if (!query.exec() || !query.next())
+        return std::nullopt;
+    return readMoment(query);
+}
+
 std::optional<MomentRecord> MomentRepository::latestMoment() const
 {
     QSqlQuery query(m_database);
-    if (!query.exec(QStringLiteral(
-            "SELECT moment_id, track_id, source_id, source_path, title, artist, album, "
-            "artwork_url, identity_color, period_label, confirmed_meaning, created_at "
-            "FROM moments ORDER BY created_at DESC, rowid DESC LIMIT 1"))
-        || !query.next()) {
-        return std::nullopt;
-    }
+    const QString sql = QStringLiteral("SELECT ")
+        + momentProjection()
+        + QStringLiteral(
+            " FROM moments ORDER BY created_at DESC, rowid DESC LIMIT 1");
 
-    MomentRecord moment;
-    moment.momentId = query.value(0).toString();
-    moment.trackId = query.value(1).toString();
-    moment.sourceId = query.value(2).toString();
-    moment.sourcePath = query.value(3).toString();
-    moment.title = query.value(4).toString();
-    moment.artist = query.value(5).toString();
-    moment.album = query.value(6).toString();
-    moment.artworkUrl = query.value(7).toString();
-    moment.identityColor = query.value(8).toString();
-    moment.periodLabel = query.value(9).toString();
-    moment.confirmedMeaning = query.value(10).toString();
-    moment.createdAt = QDateTime::fromString(
-        query.value(11).toString(), Qt::ISODateWithMs);
-    return moment;
+    if (!query.exec(sql) || !query.next())
+        return std::nullopt;
+    return readMoment(query);
 }
 
-QString MomentRepository::resolvedPlayablePath(const MomentRecord &moment) const
+QString MomentRepository::resolvedPlayablePath(
+    const MomentRecord &moment) const
 {
     if (m_database.tables().contains(QStringLiteral("track_sources"))) {
         QSqlQuery query(m_database);
@@ -180,6 +225,31 @@ bool MomentRepository::keepMoment(const MomentRecord &moment)
         return true;
 
     m_lastError = query.lastError().text();
+    return false;
+}
+
+bool MomentRepository::updateConfirmedMeaning(
+    const QString &momentId,
+    const QString &confirmedMeaning)
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(
+        "UPDATE moments SET confirmed_meaning = ?, updated_at = ?, "
+        "provenance_json = ? WHERE moment_id = ?"));
+    query.addBindValue(nonNull(confirmedMeaning));
+    query.addBindValue(nowUtc());
+    query.addBindValue(provenanceJson());
+    query.addBindValue(momentId);
+
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        return false;
+    }
+
+    if (query.numRowsAffected() > 0)
+        return true;
+
+    m_lastError = QStringLiteral("Moment not found");
     return false;
 }
 

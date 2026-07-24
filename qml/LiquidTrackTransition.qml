@@ -133,6 +133,7 @@ Item {
             context: AuroraTypes.MusicSpace
             accessibilityMode: root.accessibilityMode
             qualityMode: root.qualityMode
+            heroMode: true
         }
     }
 
@@ -155,6 +156,7 @@ Item {
             context: AuroraTypes.MusicSpace
             accessibilityMode: root.accessibilityMode
             qualityMode: root.qualityMode
+            heroMode: true
         }
     }
 

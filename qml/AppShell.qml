@@ -4,9 +4,11 @@ import Aurora.Runtime 1.0
 Item {
     id: root
 
-    property int currentPage: 0 // 0 Home, 1 Music Space, 2 Gallery
+    property int currentPage: 0 // 0 Home, 1 Music Space, 2 Gallery, 3 Memory
     property int accessibilityMode: AuroraTypes.AccessibilityNormal
     property int qualityMode: AuroraTypes.Balanced
+    property int transitionOriginPage: 0
+    property int musicReturnPage: 0
     property rect transitionStartRect: Qt.rect(0, 0, 0, 0)
     property rect transitionEndRect: Qt.rect(0, 0, 0, 0)
     property string transitionTitle: "Quiet Signals"
@@ -34,26 +36,39 @@ Item {
             return
 
         prepareCurrentIdentity()
+        transitionOriginPage = 0
+        musicReturnPage = 0
         transitionStartRect = home.identityAnchorRect()
         transitionEndRect = musicSpace.identityAnchorRect()
         identityTransition.startForward()
         currentPage = 1
     }
 
-    function recallLatestMoment() {
-        if (identityTransitionRunning || !Moments.latestAvailable)
+    function recallMoment(momentId, originPage) {
+        if (identityTransitionRunning
+                || !Moments.selectMoment(momentId)
+                || !Moments.selectedAvailable) {
             return
+        }
 
-        transitionTitle = Moments.latestTitle
-        transitionArtist = Moments.latestArtist
-        transitionArtworkSource = Moments.latestArtworkSource
-        transitionIdentityColor = Moments.latestIdentityColor
-        AudioRuntime.setQueue([Moments.latestUrl])
+        transitionTitle = Moments.selectedTitle
+        transitionArtist = Moments.selectedArtist
+        transitionArtworkSource = Moments.selectedArtworkSource
+        transitionIdentityColor = Moments.selectedIdentityColor
+        AudioRuntime.setQueue([Moments.selectedUrl])
 
-        transitionStartRect = home.identityAnchorRect()
+        transitionOriginPage = originPage
+        musicReturnPage = originPage
+        transitionStartRect = originPage === 3
+                ? memoryFlow.identityAnchorRect()
+                : home.identityAnchorRect()
         transitionEndRect = musicSpace.identityAnchorRect()
         identityTransition.startForward()
         currentPage = 1
+    }
+
+    function recallLatestMoment() {
+        root.recallMoment(Moments.latestMomentId, 0)
     }
 
     function leaveMusicSpace() {
@@ -61,10 +76,13 @@ Item {
             return
 
         prepareCurrentIdentity()
-        transitionStartRect = home.identityAnchorRect()
+        transitionOriginPage = musicReturnPage
+        transitionStartRect = musicReturnPage === 3
+                ? memoryFlow.identityAnchorRect()
+                : home.identityAnchorRect()
         transitionEndRect = musicSpace.identityAnchorRect()
         identityTransition.startReverse()
-        currentPage = 0
+        currentPage = musicReturnPage
     }
 
     Connections {
@@ -76,18 +94,28 @@ Item {
 
     AuroraHome {
         id: home
+
         anchors.fill: parent
-        visible: opacity > 0.001 || identityTransitionRunning
+        visible: opacity > 0.001
+                 || (identityTransitionRunning
+                     && root.transitionOriginPage === 0)
         enabled: root.currentPage === 0 && !identityTransitionRunning
         opacity: identityTransitionRunning
+                 && root.transitionOriginPage === 0
                  ? 1.0 - identityTransition.progress
                  : root.currentPage === 0 ? 1.0 : 0.0
-        identityVisible: !identityTransitionRunning
+        identityVisible: !(identityTransitionRunning
+                           && root.transitionOriginPage === 0)
         transitioning: identityTransitionRunning
+                       && root.transitionOriginPage === 0
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
         onOpenMusicSpace: root.enterMusicSpace()
         onRecallLatestMoment: root.recallLatestMoment()
+        onOpenMemoryFlow: {
+            Moments.selectMoment(Moments.latestMomentId)
+            root.currentPage = 3
+        }
         onOpenGallery: root.currentPage = 2
 
         Behavior on opacity {
@@ -101,6 +129,7 @@ Item {
 
     MusicSpace {
         id: musicSpace
+
         anchors.fill: parent
         visible: opacity > 0.001 || identityTransitionRunning
         enabled: root.currentPage === 1 && !identityTransitionRunning
@@ -141,8 +170,43 @@ Item {
         }
     }
 
+    MemoryFlow {
+        id: memoryFlow
+
+        anchors.fill: parent
+        visible: opacity > 0.001
+                 || (identityTransitionRunning
+                     && root.transitionOriginPage === 3)
+        enabled: root.currentPage === 3 && !identityTransitionRunning
+        opacity: identityTransitionRunning
+                 && root.transitionOriginPage === 3
+                 ? 1.0 - identityTransition.progress
+                 : root.currentPage === 3 ? 1.0 : 0.0
+        identityVisible: !(identityTransitionRunning
+                           && root.transitionOriginPage === 3)
+        transitioning: identityTransitionRunning
+                       && root.transitionOriginPage === 3
+        accessibilityMode: root.accessibilityMode
+        qualityMode: root.qualityMode
+        onCloseRequested: root.currentPage = 0
+        onRecallMoment: momentId => root.recallMoment(momentId, 3)
+        onManageSourcesRequested: {
+            root.musicReturnPage = 3
+            root.currentPage = 1
+        }
+
+        Behavior on opacity {
+            enabled: !identityTransitionRunning
+            NumberAnimation {
+                duration: AuroraTokens.motionFlow
+                easing.type: Easing.OutCubic
+            }
+        }
+    }
+
     IdentityTransitionLayer {
         id: identityTransition
+
         anchors.fill: parent
         fromRect: root.transitionStartRect
         toRect: root.transitionEndRect

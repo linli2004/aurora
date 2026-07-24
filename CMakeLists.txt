@@ -59,6 +59,7 @@ set(AURORA_QML_FILES
     qml/AuroraCrystal.qml
     qml/AuroraMoment.qml
     qml/AuroraHome.qml
+    qml/MemoryFlow.qml
     qml/MusicSpace.qml
     qml/ComponentGallery.qml
     qml/IdentityTransitionLayer.qml

@@ -14,9 +14,13 @@ Item {
     property bool flowSceneEnabled: true
     property bool libraryMenuExpanded: false
     property bool tracksPanelExpanded: false
+    property bool controlMode: false
+    property bool momentFeedbackVisible: false
 
     readonly property string displayTitle: AudioRuntime.hasTrack ? AudioRuntime.title : "Quiet Signals"
     readonly property string displayArtist: AudioRuntime.hasTrack ? AudioRuntime.artist : "Aurora Demo"
+    readonly property string displayArtistLine:
+        root.displayArtist === "Local audio" ? "" : root.displayArtist
     readonly property string displayAlbum: AudioRuntime.hasTrack ? AudioRuntime.album : ""
     readonly property color displayIdentityColor:
         AudioRuntime.hasTrack && AudioRuntime.identityColorAvailable
@@ -25,6 +29,14 @@ Item {
     readonly property real progressRatio:
         AudioRuntime.duration > 0 ? Math.min(1, AudioRuntime.position / AudioRuntime.duration) : 0
     readonly property bool libraryBrowserAvailable: LocalLibrary.sourceCount > 0 || LocalLibrary.searchText.length > 0
+    readonly property bool forceControlsVisible:
+        !AudioRuntime.hasTrack && LocalLibrary.trackCount === 0
+    readonly property bool controlsVisible:
+        root.forceControlsVisible
+        || root.controlMode
+        || root.libraryMenuExpanded
+        || root.tracksPanelExpanded
+    readonly property real controlOpacity: root.controlsVisible ? 1.0 : 0.0
     readonly property string firstRunLibraryMessage: LocalLibrary.defaultMusicDirectoryAvailable ? "First run · scan Music folder" : "First run · choose a music folder"
     readonly property bool currentMomentKeepable:
         AudioRuntime.hasTrack
@@ -51,7 +63,7 @@ Item {
         if (!root.currentMomentKeepable)
             return
 
-        Moments.keepCurrentMoment(
+        if (Moments.keepCurrentMoment(
             AudioRuntime.trackId,
             AudioRuntime.sourceId,
             AudioRuntime.filePath,
@@ -60,7 +72,16 @@ Item {
             AudioRuntime.album,
             AudioRuntime.artworkSource,
             root.displayIdentityColor,
-            "")
+            "")) {
+            root.momentFeedbackVisible = true
+            momentFeedbackTimer.restart()
+        }
+    }
+
+    function revealControls() {
+        root.controlMode = true
+        if (!root.libraryMenuExpanded && !root.tracksPanelExpanded)
+            controlHideTimer.restart()
     }
 
     function beginTrackTransition(direction) {
@@ -79,8 +100,12 @@ Item {
     }
 
     focus: visible
-    Keys.onSpacePressed: AudioRuntime.togglePlayback()
+    Keys.onSpacePressed: {
+        root.revealControls()
+        AudioRuntime.togglePlayback()
+    }
     Keys.onLeftPressed: event => {
+        root.revealControls()
         if (event.modifiers & Qt.ShiftModifier)
             root.beginTrackTransition(-1)
         else
@@ -88,6 +113,7 @@ Item {
         event.accepted = true
     }
     Keys.onRightPressed: event => {
+        root.revealControls()
         if (event.modifiers & Qt.ShiftModifier)
             root.beginTrackTransition(1)
         else
@@ -95,6 +121,7 @@ Item {
         event.accepted = true
     }
     Keys.onPressed: event => {
+        root.revealControls()
         if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_O) {
             audioDialog.open()
             event.accepted = true
@@ -113,7 +140,6 @@ Item {
         }
         if (event.key === Qt.Key_D
                 && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
-            root.diagnosticsVisible = !root.diagnosticsVisible
             event.accepted = true
             return
         }
@@ -125,8 +151,43 @@ Item {
     }
 
     onVisibleChanged: {
-        if (visible)
+        if (visible) {
+            root.controlMode = root.forceControlsVisible
             forceActiveFocus()
+        }
+    }
+
+    onLibraryMenuExpandedChanged: {
+        if (libraryMenuExpanded)
+            root.revealControls()
+        else if (!tracksPanelExpanded)
+            controlHideTimer.restart()
+    }
+
+    onTracksPanelExpandedChanged: {
+        if (tracksPanelExpanded)
+            root.revealControls()
+        else if (!libraryMenuExpanded)
+            controlHideTimer.restart()
+    }
+
+    Timer {
+        id: controlHideTimer
+        interval: 4000
+        repeat: false
+        onTriggered: {
+            if (!root.forceControlsVisible
+                    && !root.libraryMenuExpanded
+                    && !root.tracksPanelExpanded)
+                root.controlMode = false
+        }
+    }
+
+    Timer {
+        id: momentFeedbackTimer
+        interval: 1800
+        repeat: false
+        onTriggered: root.momentFeedbackVisible = false
     }
 
     FileDialog {
@@ -146,11 +207,19 @@ Item {
         onAccepted: LocalLibrary.scanDirectory(selectedFolder)
     }
 
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        z: 10
+        onPositionChanged: root.revealControls()
+    }
+
     AtmosphereField {
         anchors.fill: parent
         primaryColor: root.displayIdentityColor
         secondaryColor: AuroraTokens.memoryAccent
-        presenceLevel: AudioRuntime.playing ? 0.34 : AudioRuntime.hasTrack ? 0.26 : 0.18
+        presenceLevel: AudioRuntime.playing ? 0.50 : AudioRuntime.hasTrack ? 0.34 : 0.22
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
         audioReactiveAvailable: AudioRuntime.audioReactiveAvailable
@@ -175,7 +244,7 @@ Item {
         anchors.fill: parent
         primaryColor: root.displayIdentityColor
         secondaryColor: AuroraTokens.memoryAccent
-        presenceLevel: AudioRuntime.playing ? 0.38 : AudioRuntime.hasTrack ? 0.28 : 0.18
+        presenceLevel: AudioRuntime.playing ? 0.56 : AudioRuntime.hasTrack ? 0.38 : 0.22
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
         audioReactiveAvailable: AudioRuntime.audioReactiveAvailable
@@ -196,12 +265,49 @@ Item {
         }
     }
 
+    Item {
+        anchors.centerIn: parent
+        anchors.verticalCenterOffset: -34
+        width: Math.min(root.width * 0.58, root.height * 0.78)
+        height: width * 0.86
+        opacity: AudioRuntime.hasTrack ? 0.62 : 0.36
+        scale: 1.0 + AudioRuntime.bassEnergy * 0.035 + AudioRuntime.transientEnergy * 0.020
+
+        Rectangle {
+            anchors.fill: parent
+            radius: Math.min(width, height) * 0.22
+            color: Qt.rgba(root.displayIdentityColor.r,
+                           root.displayIdentityColor.g,
+                           root.displayIdentityColor.b,
+                           0.040 + AudioRuntime.audioLevel * 0.030)
+            rotation: -8 + AudioRuntime.midEnergy * 3
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width * 0.74
+            height: parent.height * 0.62
+            radius: Math.min(width, height) * 0.24
+            color: Qt.rgba(AuroraTokens.memoryAccent.r,
+                           AuroraTokens.memoryAccent.g,
+                           AuroraTokens.memoryAccent.b,
+                           0.030 + AudioRuntime.highEnergy * 0.034)
+            rotation: 11 - AudioRuntime.highEnergy * 4
+        }
+
+        Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
+    }
+
     Rectangle {
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.margins: 28
         width: 88
         height: 42
+        enabled: root.controlsVisible
+        opacity: root.controlOpacity
+        scale: 0.965 + root.controlOpacity * 0.035
         radius: 21
         color: Qt.rgba(1, 1, 1, 0.07)
         border.width: 1
@@ -215,6 +321,9 @@ Item {
         }
 
         TapHandler { onTapped: root.closeRequested() }
+
+        Behavior on opacity { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
     }
 
     Rectangle {
@@ -224,6 +333,9 @@ Item {
         anchors.topMargin: 28
         width: 124
         height: 42
+        enabled: root.controlsVisible
+        opacity: root.controlOpacity
+        scale: 0.965 + root.controlOpacity * 0.035
         radius: 21
         color: root.flowSceneEnabled
                ? Qt.rgba(root.displayIdentityColor.r,
@@ -245,6 +357,9 @@ Item {
         }
 
         TapHandler { onTapped: root.flowSceneEnabled = !root.flowSceneEnabled }
+
+        Behavior on opacity { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
     }
 
     Rectangle {
@@ -254,6 +369,9 @@ Item {
         anchors.topMargin: 28
         width: 124
         height: 42
+        enabled: root.controlsVisible
+        opacity: root.controlOpacity
+        scale: 0.965 + root.controlOpacity * 0.035
         radius: 21
         color: root.currentMomentKeepable
                ? Qt.rgba(root.displayIdentityColor.r,
@@ -282,6 +400,9 @@ Item {
             enabled: root.currentMomentKeepable
             onTapped: root.keepCurrentMoment()
         }
+
+        Behavior on opacity { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
     }
 
     Text {
@@ -299,10 +420,14 @@ Item {
                : AuroraTokens.textMuted
         font.pixelSize: 10
         elide: Text.ElideRight
-        visible: text.length > 0
+        visible: text.length > 0 || root.momentFeedbackVisible
+        opacity: root.momentFeedbackVisible ? 1.0 : root.controlOpacity
+
+        Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
     }
 
     Rectangle {
+        visible: false
         anchors.right: parent.right
         anchors.rightMargin: 172
         anchors.top: parent.top
@@ -353,6 +478,9 @@ Item {
         anchors.margins: 28
         width: 132
         height: 42
+        enabled: root.controlsVisible
+        opacity: root.controlOpacity
+        scale: 0.965 + root.controlOpacity * 0.035
         radius: 21
         color: Qt.rgba(1, 1, 1, 0.07)
         border.width: 1
@@ -366,6 +494,9 @@ Item {
         }
 
         TapHandler { onTapped: audioDialog.open() }
+
+        Behavior on opacity { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
     }
 
     Item {
@@ -377,6 +508,12 @@ Item {
         height: libraryMenuExpanded
                 ? ((LocalLibrary.firstRun || LocalLibrary.libraryRootCount > 0) ? 184 : 150)
                 : 42
+        enabled: root.controlsVisible
+        opacity: root.controlOpacity
+        scale: 0.965 + root.controlOpacity * 0.035
+
+        Behavior on opacity { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
 
         Rectangle {
             id: libraryMenuButton
@@ -571,6 +708,12 @@ Item {
         width: Math.min(336, root.width * 0.31)
         height: root.tracksPanelExpanded ? Math.min(438, root.height - 146) : 42
         visible: root.width >= 920
+        enabled: root.controlsVisible
+        opacity: root.controlOpacity
+        scale: 0.965 + root.controlOpacity * 0.035
+
+        Behavior on opacity { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
 
         Rectangle {
             id: tracksButton
@@ -783,6 +926,7 @@ Item {
     }
 
     AudioDiagnostics {
+        visible: false
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: 28
@@ -825,12 +969,13 @@ Item {
             }
         }
         width: Math.min(parent.width * 0.72, 620)
-        spacing: 20
+        spacing: root.controlsVisible ? 20 : 18
 
         AuroraCrystal {
             id: mainCrystal
             anchors.horizontalCenter: parent.horizontalCenter
-            crystalSize: Math.min(390, Math.max(240, root.height * 0.40))
+            crystalSize: Math.min(root.controlsVisible ? 410 : 500,
+                                  Math.max(280, root.height * (root.controlsVisible ? 0.42 : 0.54)))
             title: root.displayTitle
             artist: root.displayArtist
             artworkSource: AudioRuntime.hasTrack
@@ -843,6 +988,13 @@ Item {
             context: AuroraTypes.MusicSpace
             accessibilityMode: root.accessibilityMode
             qualityMode: root.qualityMode
+            heroMode: true
+            audioReactiveAvailable: AudioRuntime.audioReactiveAvailable
+            audioLevel: AudioRuntime.audioLevel
+            bassEnergy: AudioRuntime.bassEnergy
+            midEnergy: AudioRuntime.midEnergy
+            highEnergy: AudioRuntime.highEnergy
+            transientEnergy: AudioRuntime.transientEnergy
             opacity: root.identityVisible ? 1.0 : 0.0
 
             Behavior on opacity {
@@ -874,17 +1026,23 @@ Item {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
-                text: root.displayArtist
-                      + (root.displayAlbum.length > 0 ? " · " + root.displayAlbum : "")
-                      + (AudioRuntime.queueCount > 0
+                text: root.displayArtistLine
+                      + (root.displayAlbum.length > 0
+                         ? (root.displayArtistLine.length > 0 ? " · " : "") + root.displayAlbum
+                         : "")
+                      + (root.controlsVisible && AudioRuntime.queueCount > 0
+                         && (root.displayArtistLine.length > 0 || root.displayAlbum.length > 0)
                          ? " · " + (AudioRuntime.currentIndex + 1) + "/" + AudioRuntime.queueCount
-                         : " · Local-first prototype")
+                         : root.controlsVisible && AudioRuntime.queueCount > 0
+                           ? (AudioRuntime.currentIndex + 1) + "/" + AudioRuntime.queueCount
+                         : "")
                 color: AuroraTokens.textSecondary
+                opacity: root.controlsVisible ? 1.0 : 0.62
                 font.pixelSize: 14
             }
 
             Text {
-                visible: AudioRuntime.hasTrack
+                visible: false
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
@@ -916,6 +1074,7 @@ Item {
                 text: root.formatTime(AudioRuntime.position)
                 color: AuroraTokens.textMuted
                 font.pixelSize: 12
+                opacity: root.controlOpacity
             }
 
             Rectangle {
@@ -927,7 +1086,10 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 height: 5
                 radius: 3
-                color: Qt.rgba(1, 1, 1, 0.11)
+                opacity: AudioRuntime.hasTrack
+                         ? 0.24 + root.controlOpacity * 0.76
+                         : root.controlOpacity
+                color: Qt.rgba(1, 1, 1, root.controlsVisible ? 0.11 : 0.055)
 
                 Rectangle {
                     width: parent.width * root.progressRatio
@@ -938,7 +1100,7 @@ Item {
 
                 TapHandler {
                     id: progressTap
-                    enabled: AudioRuntime.duration > 0
+                    enabled: root.controlsVisible && AudioRuntime.duration > 0
                     onTapped: {
                         AudioRuntime.position = AudioRuntime.duration
                                                 * Math.max(0, Math.min(1,
@@ -953,6 +1115,7 @@ Item {
                 text: root.formatTime(AudioRuntime.duration)
                 color: AuroraTokens.textMuted
                 font.pixelSize: 12
+                opacity: root.controlOpacity
             }
         }
 
@@ -963,6 +1126,9 @@ Item {
             Rectangle {
                 width: 76
                 height: 42
+                enabled: root.controlsVisible
+                opacity: root.controlOpacity
+                scale: 0.965 + root.controlOpacity * 0.035
                 radius: 21
                 color: Qt.rgba(1, 1, 1, 0.07)
                 border.width: 1
@@ -979,16 +1145,21 @@ Item {
                     enabled: !liquidTrackTransition.running
                     onTapped: root.beginTrackTransition(-1)
                 }
+
+                Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
             }
 
             AuroraCore {
                 anchors.verticalCenter: parent.verticalCenter
-                diameter: 90
+                diameter: root.controlsVisible ? 90 : 76
                 experienceState: root.transitioning || liquidTrackTransition.running
                                  ? AuroraTypes.CoreGathering
                                  : AudioRuntime.coreExperienceState
                 context: AuroraTypes.MusicSpace
-                presenceLevel: AudioRuntime.playing ? 0.72 : AudioRuntime.hasTrack ? 0.38 : 0.24
+                presenceLevel: root.controlsVisible
+                               ? (AudioRuntime.playing ? 0.72 : AudioRuntime.hasTrack ? 0.38 : 0.24)
+                               : (AudioRuntime.playing ? 0.48 : AudioRuntime.hasTrack ? 0.26 : 0.18)
                 accessibilityMode: root.accessibilityMode
                 qualityMode: root.qualityMode
                 onRequestPlayPause: {
@@ -1002,6 +1173,9 @@ Item {
             Rectangle {
                 width: 76
                 height: 42
+                enabled: root.controlsVisible
+                opacity: root.controlOpacity
+                scale: 0.965 + root.controlOpacity * 0.035
                 radius: 21
                 color: Qt.rgba(1, 1, 1, 0.07)
                 border.width: 1
@@ -1018,12 +1192,21 @@ Item {
                     enabled: !liquidTrackTransition.running
                     onTapped: root.beginTrackTransition(1)
                 }
+
+                Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
             }
         }
 
         Row {
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: 10
+            enabled: root.controlsVisible
+            opacity: root.controlOpacity
+            scale: 0.965 + root.controlOpacity * 0.035
+
+            Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+            Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter

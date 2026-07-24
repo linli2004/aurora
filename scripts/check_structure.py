@@ -9,6 +9,7 @@ REQUIRED = [
     "CMakeLists.txt",
     "CMakePresets.json",
     "README.md", "packaging/linux/aurora.desktop.in", "packaging/linux/aurora.svg",
+    "Aurora_项目计划与UI方案_v1.0.md",
     "app/main.cpp",
     "runtime/AuroraTypes.h",
     "runtime/AuroraStateMapper.h",
@@ -41,6 +42,7 @@ REQUIRED = [
     "qml/AuroraCore.qml",
     "qml/AuroraMoment.qml",
     "qml/AuroraCrystal.qml",
+    "qml/MemoryFlow.qml",
     "qml/ComponentGallery.qml",
     "qml/IdentityTransitionLayer.qml",
     "fixtures/moments.json",
@@ -63,6 +65,10 @@ REQUIRED = [
     "docs/reviews/AUR-027_AUTOMATIC_LIBRARY_REFRESH_REVIEW.md",
     "docs/tasks/AUR-028_FIRST_REAL_MOMENT_LOOP.md",
     "docs/reviews/AUR-028_FIRST_REAL_MOMENT_LOOP_REVIEW.md",
+    "docs/tasks/AUR-029_MEMORY_FLOW_MEANING.md",
+    "docs/reviews/AUR-029_MEMORY_FLOW_MEANING_REVIEW.md",
+    "docs/tasks/AUR-DEMO_SPRINT.md",
+    "docs/reviews/AUR-DEMO_SPRINT_REVIEW.md",
     "docs/tasks/AUR-027_AUTOMATIC_LIBRARY_REFRESH.md",
 ]
 

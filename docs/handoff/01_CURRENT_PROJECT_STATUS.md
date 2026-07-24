@@ -39,6 +39,9 @@
 - Flow Scene；
 - Audio Diagnostics；
 - Track Transition 原型。
+- Memory Flow；
+- Presence-first Music Space Demo；
+- Demo Hero Crystal。
 
 ---
 
@@ -98,16 +101,15 @@ Reduced Motion 仍需后续任务验证。
 - 本地音乐库扫描、SQLite 持久化、Tracks 浏览、搜索和点选播放已形成
   Local Alpha demo 闭环；
 - Scanner 已具备后台执行、进度计数、取消和 UI 刷新；
-- 播放队列已具备最小会话恢复：队列 URL、当前索引和音量。
+- 播放队列已具备会话恢复：队列 URL、当前索引、音量和播放位置；
+- Moment 已具备多条 Memory Flow、选择、Recall 和 Confirmed Meaning 编辑；
+- Music Space 已具备 Presence / Control 自动切换，默认不再常驻播放器控件。
 
 ## 尚未实现
 
-- 完整播放队列持久化，包括播放位置、Scene 和 Transition Personality；
+- 完整体验状态持久化，包括 Scene 和 Transition Personality；
 - 收藏、最近播放和用户设置 UI；
-- MPRIS 系统媒体控制；
 - Aurora Memory Engine；
-- Moment Capture / Keep This Moment；
-- Recall；
 - Emotion Graph；
 - Intelligence Layer；
 - 在线 Music Provider；
@@ -125,12 +127,12 @@ Reduced Motion 仍需后续任务验证。
 2. 复杂 QML 属性动画可能受 GUI 线程负载影响；
 3. Audio Buffer 分析依赖 Qt Multimedia 后端能力；
 4. 当前元数据索引仍主要来自文件名/播放时元数据，不适合大型音乐库；
-5. 当前队列恢复只保存 URL、索引和音量，尚未保存位置和场景人格；
+5. 当前体验恢复尚未保存 Scene 和 Transition Personality；
 6. 视觉参数仍可能散落在 QML 内部；
 7. 现有 Changelog 中存在重复一级标题，需要整理；
 8. Snapshot Harness 目录存在，但还没有形成完整自动视觉回归；
 9. Transition 的音频切换时点、视觉交接和元数据更新仍需统一状态机；
-10. 未确认用户本地仓库是否已应用最后一个候选补丁。
+10. Demo Hero Crystal 尚未经过完整生产级视觉、性能和可访问性验收。
 
 ---
 

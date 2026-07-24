@@ -3,6 +3,24 @@
 
 ---
 
+# AUR-DEMO — Presence First Demo Sprint
+
+Status:
+
+```text
+In progress for local demo validation.
+```
+
+目标：
+
+- Music Space 默认 Presence Mode；
+- 控件交互浮现、空闲退场；
+- Hero Crystal 与 Atmosphere 成为第一视觉主角；
+- Home 收敛为 Moment-first 入口；
+- 不增加新的后台能力。
+
+---
+
 # AUR-013 — Freeze Local Handoff Baseline
 
 目标：

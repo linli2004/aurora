@@ -11,6 +11,7 @@ Item {
 
     signal openMusicSpace()
     signal recallLatestMoment()
+    signal openMemoryFlow()
     signal openGallery()
 
     function identityAnchorRect() {
@@ -52,16 +53,24 @@ Item {
         }
 
         Text {
-            text: "One moment first."
+            text: Moments.hasMoment
+                  ? Moments.latestHeading
+                  : "Begin with a song."
             color: AuroraTokens.textPrimary
             font.pixelSize: Math.max(34, root.width * 0.045)
             font.weight: Font.DemiBold
         }
 
         Text {
-            text: "Music, memory and atmosphere — without leaving the desktop behind."
+            width: Math.min(520, root.width * 0.42)
+            text: Moments.hasMoment
+                  ? (Moments.latestConfirmedMeaning.length > 0
+                     ? "\"" + Moments.latestConfirmedMeaning + "\""
+                     : Moments.latestTitle + " · " + Moments.latestArtist)
+                  : "Let one local track become the first remembered room."
             color: AuroraTokens.textSecondary
             font.pixelSize: 16
+            wrapMode: Text.Wrap
         }
     }
 
@@ -70,7 +79,7 @@ Item {
         anchors.centerIn: parent
         sizePreset: root.width < 980 ? 0 : 1
         title: Moments.hasMoment
-               ? "A moment kept on this device"
+               ? Moments.latestHeading
                : AudioRuntime.hasTrack
                  ? "Current local session"
                  : "The room after midnight"
@@ -103,7 +112,9 @@ Item {
                          ? AuroraTypes.MomentRecalling
                          : Moments.hasMoment
                            ? Moments.latestAvailable
-                             ? AuroraTypes.MomentRemembered
+                             ? Moments.latestConfirmedMeaning.length > 0
+                               ? AuroraTypes.MomentMeaningful
+                               : AuroraTypes.MomentRemembered
                              : AuroraTypes.MomentDetached
                            : AudioRuntime.hasTrack
                              ? AuroraTypes.MomentPresent
@@ -128,10 +139,42 @@ Item {
 
     Rectangle {
         anchors.right: parent.right
+        anchors.rightMargin: 172
+        anchors.top: parent.top
+        anchors.topMargin: 28
+        width: 132
+        height: 42
+        radius: 21
+        color: Moments.hasMoment
+               ? Qt.rgba(Moments.latestIdentityColor.r,
+                         Moments.latestIdentityColor.g,
+                         Moments.latestIdentityColor.b, 0.16)
+               : Qt.rgba(1, 1, 1, 0.055)
+        border.width: 1
+        border.color: Qt.rgba(1, 1, 1, 0.10)
+
+        Text {
+            anchors.centerIn: parent
+            text: Moments.hasMoment
+                  ? "Memory · " + Moments.momentCount
+                  : "Memory"
+            color: AuroraTokens.textSecondary
+            font.pixelSize: 13
+        }
+
+        TapHandler {
+            enabled: Moments.hasMoment
+            onTapped: root.openMemoryFlow()
+        }
+    }
+
+    Rectangle {
+        anchors.right: parent.right
         anchors.top: parent.top
         anchors.margins: 28
         width: 132
         height: 42
+        visible: false
         radius: 21
         color: Qt.rgba(1, 1, 1, 0.07)
         border.width: 1

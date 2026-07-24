@@ -81,6 +81,7 @@ Item {
         context: root.progress < 0.5 ? AuroraTypes.Moment : AuroraTypes.MusicSpace
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
+        heroMode: root.progress >= 0.42
     }
 
     NumberAnimation {

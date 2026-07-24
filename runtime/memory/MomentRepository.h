@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDateTime>
+#include <QList>
 #include <QSqlDatabase>
 #include <QString>
 
@@ -31,11 +32,18 @@ public:
     [[nodiscard]] bool open(const QString &databasePath);
     [[nodiscard]] QString lastError() const;
     [[nodiscard]] int count() const;
+    [[nodiscard]] QList<MomentRecord> moments() const;
+    [[nodiscard]] std::optional<MomentRecord> moment(
+        const QString &momentId) const;
     [[nodiscard]] std::optional<MomentRecord> latestMoment() const;
-    [[nodiscard]] QString resolvedPlayablePath(const MomentRecord &moment) const;
+    [[nodiscard]] QString resolvedPlayablePath(
+        const MomentRecord &moment) const;
 
     bool initializeSchema();
     bool keepMoment(const MomentRecord &moment);
+    bool updateConfirmedMeaning(
+        const QString &momentId,
+        const QString &confirmedMeaning);
 
 private:
     [[nodiscard]] bool execSchema(const QString &sql);

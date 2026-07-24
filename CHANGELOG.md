@@ -26,6 +26,10 @@
 - Added multi-folder Rescan all with unavailable-root reporting and post-scan source reconciliation.
 - Added recursive remembered-folder watching with a debounced automatic full-library refresh.
 - Added startup background refresh and watcher debounce tests.
+- Added Presence-first Music Space demo behavior with interaction-revealed controls and idle retreat.
+- Added Demo Hero Crystal styling with audio-reactive pulse, tilt and edge light.
+- Strengthened the Music Space atmosphere around the current music identity.
+- Refined Home into a Moment-first demo entry and hid Component Gallery from the default Home.
 - Added repository tests for schema creation, TrackSource persistence and duplicate content.
 - Added repository tests for track search and settings persistence.
 - Added stable local Track ID generation from bounded file-content sampling.
