@@ -8,7 +8,7 @@ REQUIRED = [
     "AGENTS.md",
     "CMakeLists.txt",
     "CMakePresets.json",
-    "README.md",
+    "README.md", "packaging/linux/aurora.desktop.in", "packaging/linux/aurora.svg",
     "app/main.cpp",
     "runtime/AuroraTypes.h",
     "runtime/AuroraStateMapper.h",

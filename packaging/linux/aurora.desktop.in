@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Aurora
+GenericName=Music Player
+Comment=Ubuntu-native personal music environment
+Exec=@CMAKE_INSTALL_FULL_BINDIR@/aurora
+Icon=aurora
+Terminal=false
+Categories=Audio;Music;Player;AudioVideo;
+Keywords=Music;Audio;Player;Aurora;
+StartupNotify=true
+StartupWMClass=aurora

@@ -15,6 +15,8 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     QCoreApplication::setOrganizationName(QStringLiteral("Aurora"));
     QCoreApplication::setApplicationName(QStringLiteral("Aurora Music Framework"));
+    QGuiApplication::setApplicationDisplayName(QStringLiteral("Aurora"));
+    QGuiApplication::setDesktopFileName(QStringLiteral("aurora"));
     QCoreApplication::setApplicationVersion(QStringLiteral("0.5.3"));
 
     qmlRegisterUncreatableMetaObject(
