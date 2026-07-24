@@ -27,6 +27,8 @@ REQUIRED = [
     "runtime/library/LocalLibraryService.cpp",
     "runtime/library/LocalLibraryTrackModel.h",
     "runtime/library/LocalLibraryTrackModel.cpp",
+    "runtime/library/LocalLibraryWatcher.h",
+    "runtime/library/LocalLibraryWatcher.cpp",
     "qml/Main.qml",
     "qml/AuroraTokens.qml",
     "qml/AudioDiagnostics.qml",
@@ -44,6 +46,7 @@ REQUIRED = [
     "tests/test_audio_feature_analyzer.cpp",
     "tests/test_local_track_identity.cpp",
     "tests/test_local_library_repository.cpp",
+    "tests/test_local_library_watcher.cpp",
     "docs/engineering/MVP_v0.1.md",
     "docs/engineering/ARCHITECTURE.md",
     "docs/reviews/AUR-024_INSTALLED_RUNTIME_FIRST_RUN_REVIEW.md",
@@ -52,6 +55,8 @@ REQUIRED = [
     "docs/tasks/AUR-025_MISSING_SOURCE_RELINK.md",
     "docs/reviews/AUR-026_PERSISTENT_LIBRARY_ROOTS_RESCAN_REVIEW.md",
     "docs/tasks/AUR-026_PERSISTENT_LIBRARY_ROOTS_RESCAN.md",
+    "docs/reviews/AUR-027_AUTOMATIC_LIBRARY_REFRESH_REVIEW.md",
+    "docs/tasks/AUR-027_AUTOMATIC_LIBRARY_REFRESH.md",
 ]
 
 missing = [path for path in REQUIRED if not (ROOT / path).is_file()]

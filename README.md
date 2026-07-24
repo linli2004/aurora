@@ -32,6 +32,7 @@ Implemented as an initial scaffold:
 - First-run library guidance with one-step Music folder scanning
 - Missing-source reconciliation with stable Track relink after file moves
 - Persistent local library roots with multi-folder Rescan all
+- Debounced automatic library refresh for remembered folders while Aurora is running
 - Embedded artwork extraction with a trusted Generated Identity fallback
 - Decoded-audio feature analysis for level, bass, mid, high and transient presence
 - Audio-reactive Atmosphere with Reduced Motion and Eco fallbacks
@@ -43,6 +44,7 @@ Implemented as an initial scaffold:
 Deferred:
 
 - Full metadata index refinement, albums view, root removal, delete commands and interactive relink UX
+- Production-scale watcher overflow recovery and per-file incremental indexing
 - Full persistent experience state including scene and transition personality
 - Emotion Graph and Intelligence Layer
 - Production Memory persistence
@@ -94,11 +96,12 @@ cmake --build --preset dev
 3. Choose a local music directory and watch the scan count update.
 4. Add another folder, restart Aurora, and confirm the remembered-folder summary remains visible.
 5. Select **Rescan all** to scan every remembered readable root and reconcile missing sources.
-6. Use **Cancel scan** during a long scan if needed.
-7. Open **Tracks**, search the library, click a row to play from that track, or select **Play list**.
-8. Play beyond the opening seconds, restart Aurora, and confirm the queue, current track, volume and position return without autoplay.
-9. On a fresh library, open Library and choose Scan Music or Choose folder to start first-run setup.
-10. While a track is loaded, run `playerctl -l` and confirm Aurora is exposed as an MPRIS player.
+6. Add, move or remove an audio file inside a remembered readable root and confirm the library refreshes automatically after the debounce window.
+7. Use **Cancel scan** during a long scan if needed.
+8. Open **Tracks**, search the library, click a row to play from that track, or select **Play list**.
+9. Play beyond the opening seconds, restart Aurora, and confirm the queue, current track, volume and position return without autoplay.
+10. On a fresh library, open Library and choose Scan Music or Choose folder to start first-run setup.
+11. While a track is loaded, run `playerctl -l` and confirm Aurora is exposed as an MPRIS player.
 
 ## Local Desktop Install
 

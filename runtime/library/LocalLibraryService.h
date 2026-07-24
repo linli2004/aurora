@@ -9,6 +9,7 @@
 #include <QVariantList>
 
 #include "runtime/library/LocalLibraryTrackModel.h"
+#include "runtime/library/LocalLibraryWatcher.h"
 
 class LocalLibraryService final : public QObject
 {
@@ -21,6 +22,8 @@ class LocalLibraryService final : public QObject
     Q_PROPERTY(int libraryRootCount READ libraryRootCount NOTIFY rootsChanged)
     Q_PROPERTY(int unavailableRootCount READ unavailableRootCount NOTIFY rootsChanged)
     Q_PROPERTY(QString libraryRootsSummary READ libraryRootsSummary NOTIFY rootsChanged)
+    Q_PROPERTY(bool automaticRefreshActive READ automaticRefreshActive NOTIFY watchStateChanged)
+    Q_PROPERTY(int watchedDirectoryCount READ watchedDirectoryCount NOTIFY watchStateChanged)
     Q_PROPERTY(QString databasePath READ databasePath CONSTANT)
     Q_PROPERTY(QString lastScanStatus READ lastScanStatus NOTIFY scanStatusChanged)
     Q_PROPERTY(QString errorString READ errorString NOTIFY errorChanged)
@@ -43,6 +46,8 @@ public:
     [[nodiscard]] int libraryRootCount() const;
     [[nodiscard]] int unavailableRootCount() const;
     [[nodiscard]] QString libraryRootsSummary() const;
+    [[nodiscard]] bool automaticRefreshActive() const;
+    [[nodiscard]] int watchedDirectoryCount() const;
     [[nodiscard]] QString databasePath() const;
     [[nodiscard]] QString lastScanStatus() const;
     [[nodiscard]] QString errorString() const;
@@ -70,6 +75,7 @@ signals:
     void scanningChanged();
     void libraryChanged();
     void rootsChanged();
+    void watchStateChanged();
     void scanStatusChanged();
     void errorChanged();
     void scanProgressChanged();
@@ -77,7 +83,11 @@ signals:
     void tracksChanged();
 
 private:
-    void startScan(const QStringList &rootPaths, const QString &rootToRemember = {});
+    void startScan(
+        const QStringList &rootPaths,
+        const QString &rootToRemember = {},
+        bool automaticRefresh = false);
+    void requestAutomaticRefresh();
     void refreshCounts();
     void refreshLibraryRoots();
     void refreshTracks();
@@ -91,9 +101,11 @@ private:
     QString m_defaultMusicDirectoryLabel;
     bool m_defaultMusicDirectoryAvailable = false;
     LocalLibraryTrackModel m_trackModel;
+    LocalLibraryWatcher m_libraryWatcher;
     std::shared_ptr<std::atomic_bool> m_cancelScan;
     QStringList m_libraryRoots;
     bool m_scanning = false;
+    bool m_automaticRefreshPending = false;
     int m_scannedFileCount = 0;
     int m_trackCount = 0;
     int m_sourceCount = 0;
