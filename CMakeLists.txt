@@ -170,6 +170,29 @@ if(BUILD_TESTING)
     target_link_libraries(aurora_audio_queue_tests PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME aurora.audio_queue COMMAND aurora_audio_queue_tests)
 
+    qt_add_executable(aurora_audio_runtime_tests
+        tests/test_audio_runtime.cpp
+        runtime/audio/AudioFeatureAnalyzer.cpp
+        runtime/audio/AudioFeatureAnalyzer.h
+        runtime/audio/AudioQueue.cpp
+        runtime/audio/AudioQueue.h
+        runtime/audio/AudioRuntime.cpp
+        runtime/audio/AudioRuntime.h
+        runtime/audio/LocalTrackIdentity.cpp
+        runtime/audio/LocalTrackIdentity.h
+        runtime/library/LocalLibraryRepository.cpp
+        runtime/library/LocalLibraryRepository.h
+    )
+    target_include_directories(aurora_audio_runtime_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(aurora_audio_runtime_tests PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Multimedia
+        Qt6::Sql
+        Qt6::Test
+    )
+    add_test(NAME aurora.audio_runtime COMMAND aurora_audio_runtime_tests)
+
     qt_add_executable(aurora_local_track_identity_tests
         tests/test_local_track_identity.cpp
         runtime/audio/LocalTrackIdentity.cpp

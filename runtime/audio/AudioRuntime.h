@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QHash>
 #include <QObject>
 #include <QUrl>
 #include <QVariantList>
@@ -90,6 +91,7 @@ public:
     [[nodiscard]] bool audioReactiveAvailable() const;
 
     Q_INVOKABLE void setQueue(const QVariantList &urls);
+    Q_INVOKABLE void setQueueWithMetadata(const QVariantList &tracks);
     Q_INVOKABLE void appendFiles(const QVariantList &urls);
     Q_INVOKABLE void setQueueFromText(const QString &sourceText);
     Q_INVOKABLE void appendSourcesFromText(const QString &sourceText);
@@ -124,6 +126,7 @@ private:
     QList<QUrl> validAudioSources(const QList<QUrl> &urls) const;
     QList<QUrl> urlsFromSourceText(const QString &sourceText) const;
     void loadCurrent(bool autoplay, qint64 initialPosition = -1);
+    [[nodiscard]] LocalTrackIdentity identityOverrideFor(const QUrl &url) const;
     void applyPendingSessionPosition();
     void applyTrackIdentity(const LocalTrackIdentity &identity);
     void refreshTrackIdentity();
@@ -139,6 +142,7 @@ private:
     QTimer m_sessionPersistTimer;
     QTimer m_restorePositionTimer;
     AudioQueue m_queue;
+    QHash<QString, LocalTrackIdentity> m_queueIdentityOverrides;
     LocalTrackIdentity m_trackIdentity;
     QString m_errorString;
     qint64 m_pendingRestorePosition = -1;

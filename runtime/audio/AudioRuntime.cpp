@@ -6,6 +6,7 @@
 #include <QSet>
 #include <QStandardPaths>
 #include <QTextStream>
+#include <QVariantMap>
 #include <QtGlobal>
 
 #include "runtime/AuroraTypes.h"
@@ -55,6 +56,11 @@ QString urlDedupeKey(const QUrl &url)
 {
     return url.adjusted(QUrl::NormalizePathSegments | QUrl::RemovePassword)
         .toString(QUrl::RemovePassword);
+}
+
+QString queueMetadataKey(const QUrl &url)
+{
+    return urlDedupeKey(url);
 }
 
 QStringList inputEntriesFromText(const QString &sourceText)
@@ -369,7 +375,66 @@ void AudioRuntime::setQueue(const QVariantList &urls)
         return;
     }
 
+    m_queueIdentityOverrides.clear();
     m_queue.setUrls(filtered);
+    emit queueChanged();
+    loadCurrent(true);
+    persistSession();
+}
+
+void AudioRuntime::setQueueWithMetadata(const QVariantList &tracks)
+{
+    QList<QUrl> urls;
+    urls.reserve(tracks.size());
+    QHash<QString, LocalTrackIdentity> identityOverrides;
+    QSet<QString> seen;
+
+    for (const QVariant &trackValue : tracks) {
+        const QVariantMap track = trackValue.toMap();
+        const QUrl url = QUrl::fromUserInput(track.value(QStringLiteral("url")).toString());
+        if (!url.isValid() || url.isEmpty())
+            continue;
+
+        const QList<QUrl> filtered = validAudioSources({url});
+        if (filtered.isEmpty())
+            continue;
+
+        const QUrl playableUrl = filtered.first();
+        const QString key = queueMetadataKey(playableUrl);
+        if (seen.contains(key))
+            continue;
+
+        seen.insert(key);
+        urls.append(playableUrl);
+
+        LocalTrackIdentity identity = LocalTrackIdentityResolver::fallbackFor(playableUrl);
+        const QString title = track.value(QStringLiteral("title")).toString().simplified();
+        const QString artist = track.value(QStringLiteral("artist")).toString().simplified();
+        const QString album = track.value(QStringLiteral("album")).toString().simplified();
+        const QUrl artworkUrl = QUrl::fromUserInput(track.value(QStringLiteral("artworkUrl")).toString());
+
+        if (!title.isEmpty())
+            identity.title = title;
+        if (!artist.isEmpty())
+            identity.artist = artist;
+        if (!album.isEmpty())
+            identity.album = album;
+        if (artworkUrl.isValid() && !artworkUrl.isEmpty())
+            identity.artworkSource = artworkUrl;
+
+        identity.canonicalTitle = identity.title.toCaseFolded();
+        identity.metadataAvailable = true;
+        identity.provenance = QStringLiteral("Online source catalog · Resolver metadata");
+        identityOverrides.insert(key, identity);
+    }
+
+    if (urls.isEmpty()) {
+        setErrorString(tr("No playable online source tracks were resolved."));
+        return;
+    }
+
+    m_queueIdentityOverrides = identityOverrides;
+    m_queue.setUrls(urls);
     emit queueChanged();
     loadCurrent(true);
     persistSession();
@@ -383,6 +448,7 @@ void AudioRuntime::appendFiles(const QVariantList &urls)
         return;
     }
 
+    m_queueIdentityOverrides.clear();
     const bool wasEmpty = m_queue.isEmpty();
     m_queue.appendUrls(filtered);
     emit queueChanged();
@@ -400,6 +466,7 @@ void AudioRuntime::setQueueFromText(const QString &sourceText)
         return;
     }
 
+    m_queueIdentityOverrides.clear();
     m_queue.setUrls(filtered);
     emit queueChanged();
     loadCurrent(true);
@@ -414,6 +481,7 @@ void AudioRuntime::appendSourcesFromText(const QString &sourceText)
         return;
     }
 
+    m_queueIdentityOverrides.clear();
     const bool wasEmpty = m_queue.isEmpty();
     m_queue.appendUrls(filtered);
     emit queueChanged();
@@ -432,6 +500,7 @@ void AudioRuntime::clearQueue()
     m_featureAnalyzer.reset();
     m_player.stop();
     m_player.setSource(QUrl());
+    m_queueIdentityOverrides.clear();
     m_queue.clear();
     applyTrackIdentity({});
     setErrorString({});
@@ -607,7 +676,10 @@ void AudioRuntime::loadCurrent(bool autoplay, qint64 initialPosition)
     setErrorString({});
     m_featureAnalyzer.reset();
     m_player.stop();
-    applyTrackIdentity(LocalTrackIdentityResolver::fallbackFor(url));
+    const LocalTrackIdentity overrideIdentity = identityOverrideFor(url);
+    applyTrackIdentity(overrideIdentity.trackId.isEmpty()
+                           ? LocalTrackIdentityResolver::fallbackFor(url)
+                           : overrideIdentity);
     m_player.setSource(url);
     emit semanticStateChanged();
 
@@ -649,6 +721,7 @@ void AudioRuntime::applyPendingSessionPosition()
 
 void AudioRuntime::restoreSession()
 {
+    m_queueIdentityOverrides.clear();
     LocalLibraryRepository repository;
     if (!repository.open(libraryDatabasePath()))
         return;
@@ -667,6 +740,12 @@ void AudioRuntime::restoreSession()
     emit queueChanged();
     loadCurrent(false, qMax<qint64>(
         0, session.value(QStringLiteral("positionMs"), 0).toLongLong()));
+}
+
+LocalTrackIdentity AudioRuntime::identityOverrideFor(const QUrl &url) const
+{
+    const auto iterator = m_queueIdentityOverrides.constFind(queueMetadataKey(url));
+    return iterator == m_queueIdentityOverrides.cend() ? LocalTrackIdentity{} : iterator.value();
 }
 
 void AudioRuntime::persistSession()
@@ -716,9 +795,23 @@ void AudioRuntime::refreshTrackIdentity()
     if (!hasTrack())
         return;
 
-    applyTrackIdentity(LocalTrackIdentityResolver::resolve(
+    LocalTrackIdentity identity = LocalTrackIdentityResolver::resolve(
         m_queue.currentUrl(),
-        m_player.metaData()));
+        m_player.metaData());
+    const LocalTrackIdentity overrideIdentity = identityOverrideFor(m_queue.currentUrl());
+    if (!overrideIdentity.trackId.isEmpty()) {
+        identity.title = overrideIdentity.title;
+        identity.artist = overrideIdentity.artist;
+        identity.album = overrideIdentity.album;
+        identity.canonicalTitle = overrideIdentity.canonicalTitle;
+        identity.artworkSource = overrideIdentity.artworkSource.isEmpty()
+            ? identity.artworkSource
+            : overrideIdentity.artworkSource;
+        identity.metadataAvailable = true;
+        identity.provenance = overrideIdentity.provenance;
+    }
+
+    applyTrackIdentity(identity);
 }
 
 void AudioRuntime::setErrorString(const QString &message)

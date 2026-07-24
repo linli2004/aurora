@@ -77,6 +77,15 @@ QVariantMap onlineTrackToMap(const MusicSourceRegistry::OnlineTrack &track)
     return map;
 }
 
+QVariantMap resolvedOnlineTrackToMap(
+    const MusicSourceRegistry::OnlineTrack &track,
+    const QString &musicUrl)
+{
+    QVariantMap map = onlineTrackToMap(track);
+    map.insert(QStringLiteral("url"), musicUrl);
+    return map;
+}
+
 QList<MusicSourceRegistry::OnlineTrack> defaultOnlineTracks()
 {
     return {
@@ -139,17 +148,22 @@ QString jsValueText(const QJSValue &value)
     if (value.isError())
         text = value.property(QStringLiteral("message")).toString();
 
-    if (text.isEmpty())
-        text = value.property(QStringLiteral("message")).toString();
+    const QJSValue message = value.property(QStringLiteral("message"));
+    if (text.isEmpty() && message.isString())
+        text = message.toString();
 
     if (text.isEmpty())
         text = value.toString();
+    if (text.isEmpty() || text == QStringLiteral("undefined") || text == QStringLiteral("null"))
+        text = QStringLiteral("LX source rejected without an error message.");
 
-    const int lineNumber = value.property(QStringLiteral("lineNumber")).toInt();
+    const QJSValue lineNumberValue = value.property(QStringLiteral("lineNumber"));
+    const int lineNumber = lineNumberValue.isNumber() ? lineNumberValue.toInt() : 0;
     if (lineNumber > 0)
         text += QStringLiteral(" at line %1").arg(lineNumber);
 
-    const QString stack = value.property(QStringLiteral("stack")).toString();
+    const QJSValue stackValue = value.property(QStringLiteral("stack"));
+    const QString stack = stackValue.isString() ? stackValue.toString() : QString();
     if (!stack.isEmpty())
         text += QStringLiteral(" (%1)").arg(stack);
 
@@ -211,6 +225,77 @@ QString artistsText(const QJsonArray &artists)
             names.append(name);
     }
     return names.join(QStringLiteral(" / "));
+}
+
+QString normalizedBufferEncoding(QString encoding)
+{
+    encoding = encoding.trimmed().toLower();
+    encoding.remove(QLatin1Char('-'));
+    encoding.remove(QLatin1Char('_'));
+    if (encoding.isEmpty() || encoding == QStringLiteral("undefined"))
+        return QStringLiteral("utf8");
+    if (encoding == QStringLiteral("utf8") || encoding == QStringLiteral("utf"))
+        return QStringLiteral("utf8");
+    if (encoding == QStringLiteral("base64"))
+        return QStringLiteral("base64");
+    if (encoding == QStringLiteral("hex"))
+        return QStringLiteral("hex");
+    if (encoding == QStringLiteral("latin1") || encoding == QStringLiteral("binary")
+        || encoding == QStringLiteral("ascii")) {
+        return QStringLiteral("latin1");
+    }
+    return QStringLiteral("utf8");
+}
+
+QByteArray bytesFromLeadingHex(const QString &value)
+{
+    const QByteArray input = value.toLatin1();
+    QByteArray bytes;
+    bytes.reserve(input.size() / 2);
+
+    const auto hexValue = [](char c) -> int {
+        if (c >= '0' && c <= '9')
+            return c - '0';
+        if (c >= 'a' && c <= 'f')
+            return 10 + c - 'a';
+        if (c >= 'A' && c <= 'F')
+            return 10 + c - 'A';
+        return -1;
+    };
+
+    for (qsizetype i = 0; i + 1 < input.size(); i += 2) {
+        const int high = hexValue(input.at(i));
+        const int low = hexValue(input.at(i + 1));
+        if (high < 0 || low < 0)
+            break;
+        bytes.append(static_cast<char>((high << 4) | low));
+    }
+
+    return bytes;
+}
+
+QByteArray scriptBufferBytesFromText(const QString &value, const QString &encoding)
+{
+    const QString normalizedEncoding = normalizedBufferEncoding(encoding);
+    if (normalizedEncoding == QStringLiteral("hex"))
+        return bytesFromLeadingHex(value);
+    if (normalizedEncoding == QStringLiteral("base64"))
+        return QByteArray::fromBase64(value.toLatin1());
+    if (normalizedEncoding == QStringLiteral("latin1"))
+        return value.toLatin1();
+    return value.toUtf8();
+}
+
+QString scriptBufferTextFromBytes(const QByteArray &bytes, const QString &encoding)
+{
+    const QString normalizedEncoding = normalizedBufferEncoding(encoding);
+    if (normalizedEncoding == QStringLiteral("hex"))
+        return QString::fromLatin1(bytes.toHex());
+    if (normalizedEncoding == QStringLiteral("base64"))
+        return QString::fromLatin1(bytes.toBase64());
+    if (normalizedEncoding == QStringLiteral("latin1"))
+        return QString::fromLatin1(bytes);
+    return QString::fromUtf8(bytes);
 }
 }
 
@@ -423,8 +508,11 @@ void MusicSourceRegistry::resolveFromText(const QString &requestText)
     }
 
     m_resolvingPlaylist = false;
+    m_pendingOnlineTrack.reset();
     m_playlistRequests.clear();
+    m_playlistTracks.clear();
     m_playlistResolvedUrls.clear();
+    m_playlistResolvedTracks.clear();
     startResolveRequest(request.value());
 }
 
@@ -445,8 +533,11 @@ void MusicSourceRegistry::resolveOnlineTrackAt(int index)
     }
 
     m_resolvingPlaylist = false;
+    m_pendingOnlineTrack = m_onlineTracks.at(index);
     m_playlistRequests.clear();
+    m_playlistTracks.clear();
     m_playlistResolvedUrls.clear();
+    m_playlistResolvedTracks.clear();
     startResolveRequest(request.value());
 }
 
@@ -459,11 +550,15 @@ void MusicSourceRegistry::resolveOnlineTracksFrom(int index)
         index = 0;
 
     m_playlistRequests.clear();
+    m_playlistTracks.clear();
     m_playlistResolvedUrls.clear();
+    m_playlistResolvedTracks.clear();
     for (int i = index; i < m_onlineTracks.size(); ++i) {
         const std::optional<ResolveRequest> request = resolveRequestForOnlineTrack(i);
-        if (request.has_value())
+        if (request.has_value()) {
             m_playlistRequests.append(request.value());
+            m_playlistTracks.append(m_onlineTracks.at(i));
+        }
 
         if (m_playlistRequests.size() >= 24)
             break;
@@ -475,6 +570,7 @@ void MusicSourceRegistry::resolveOnlineTracksFrom(int index)
     }
 
     m_resolvingPlaylist = true;
+    m_pendingOnlineTrack.reset();
     continuePlaylistResolve();
 }
 
@@ -663,14 +759,21 @@ void MusicSourceRegistry::continuePlaylistResolve()
 
     if (m_playlistRequests.isEmpty()) {
         m_resolvingPlaylist = false;
+        m_pendingOnlineTrack.reset();
         setResolving(false);
         setErrorString({});
         setStatusText(tr("Resolved %n online source track(s).", nullptr, m_playlistResolvedUrls.size()));
-        emit musicUrlsResolved(m_playlistResolvedUrls);
+        if (!m_playlistResolvedTracks.isEmpty())
+            emit musicTracksResolved(m_playlistResolvedTracks);
+        else
+            emit musicUrlsResolved(m_playlistResolvedUrls);
         return;
     }
 
     const ResolveRequest request = m_playlistRequests.takeFirst();
+    m_pendingOnlineTrack = m_playlistTracks.isEmpty()
+        ? std::optional<OnlineTrack> {}
+        : std::optional<OnlineTrack> { m_playlistTracks.takeFirst() };
     startResolveRequest(request);
 }
 
@@ -750,6 +853,48 @@ void MusicSourceRegistry::evaluateScriptForResolve(
             group: function(){},
             groupEnd: function(){}
         };
+        if (typeof Promise !== "undefined") {
+            if (typeof Promise.any !== "function") {
+                Promise.any = function(promises) {
+                    return new Promise(function(resolve, reject) {
+                        var list = Array.prototype.slice.call(promises || []);
+                        var pending = list.length;
+                        var errors = [];
+                        if (pending === 0) {
+                            reject(new Error("All promises were rejected"));
+                            return;
+                        }
+                        list.forEach(function(promise, index) {
+                            Promise.resolve(promise).then(
+                                resolve,
+                                function(error) {
+                                    errors[index] = error;
+                                    pending -= 1;
+                                    if (pending === 0)
+                                        reject(errors[0] || new Error("All promises were rejected"));
+                                }
+                            );
+                        });
+                    });
+                };
+            }
+            if (typeof Promise.prototype.finally !== "function") {
+                Promise.prototype.finally = function(onFinally) {
+                    return this.then(
+                        function(value) {
+                            if (typeof onFinally === "function")
+                                onFinally();
+                            return value;
+                        },
+                        function(error) {
+                            if (typeof onFinally === "function")
+                                onFinally();
+                            throw error;
+                        }
+                    );
+                };
+            }
+        }
         globalThis._auroraHandlers = {};
         globalThis.lx = {
             EVENT_NAMES: {
@@ -775,11 +920,30 @@ void MusicSourceRegistry::evaluateScriptForResolve(
             },
             utils: {
                 crypto: {
-                    md5: function(value) { return _auroraBridge.scriptMd5(String(value)); }
+                    md5: function(value) {
+                        if (value && value.__auroraBufferBase64 !== undefined)
+                            return _auroraBridge.scriptMd5FromBase64(String(value.__auroraBufferBase64));
+                        return _auroraBridge.scriptMd5(String(value));
+                    }
                 },
                 buffer: {
-                    from: function(value) { return String(value); },
-                    bufToString: function(value) { return String(value); }
+                    from: function(value, encoding) {
+                        return {
+                            __auroraBufferBase64: _auroraBridge.scriptBufferFromBase64(
+                                String(value),
+                                String(encoding || "utf8"))
+                        };
+                    },
+                    bufToString: function(value, encoding) {
+                        if (value && value.__auroraBufferBase64 !== undefined) {
+                            return _auroraBridge.scriptBufferToStringFromBase64(
+                                String(value.__auroraBufferBase64),
+                                String(encoding || "utf8"));
+                        }
+                        return _auroraBridge.scriptBufferToStringFromBase64(
+                            _auroraBridge.scriptBufferFromBase64(String(value), "utf8"),
+                            String(encoding || "utf8"));
+                    }
                 }
             }
         };
@@ -1016,6 +1180,7 @@ void MusicSourceRegistry::failCurrentResolver(const QString &message)
     ++m_resolveGeneration;
     if (QJSEngine *engine = m_scriptEngine.release())
         engine->deleteLater();
+    m_pendingOnlineTrack.reset();
 
     if (m_resolvingPlaylist && !m_playlistRequests.isEmpty()) {
         setErrorString(message);
@@ -1029,7 +1194,10 @@ void MusicSourceRegistry::failCurrentResolver(const QString &message)
         setResolving(false);
         setErrorString({});
         setStatusText(tr("Resolved %n online source track(s).", nullptr, m_playlistResolvedUrls.size()));
-        emit musicUrlsResolved(m_playlistResolvedUrls);
+        if (!m_playlistResolvedTracks.isEmpty())
+            emit musicTracksResolved(m_playlistResolvedTracks);
+        else
+            emit musicUrlsResolved(m_playlistResolvedUrls);
         return;
     }
 
@@ -1044,8 +1212,15 @@ void MusicSourceRegistry::finishCurrentResolver(const QString &musicUrl)
     if (QJSEngine *engine = m_scriptEngine.release())
         engine->deleteLater();
 
+    QVariantMap resolvedTrack;
+    if (m_pendingOnlineTrack.has_value())
+        resolvedTrack = resolvedOnlineTrackToMap(m_pendingOnlineTrack.value(), musicUrl);
+    m_pendingOnlineTrack.reset();
+
     if (m_resolvingPlaylist) {
         m_playlistResolvedUrls.append(musicUrl);
+        if (!resolvedTrack.isEmpty())
+            m_playlistResolvedTracks.append(resolvedTrack);
         if (!m_playlistRequests.isEmpty()) {
             QTimer::singleShot(0, this, &MusicSourceRegistry::continuePlaylistResolve);
             return;
@@ -1055,14 +1230,20 @@ void MusicSourceRegistry::finishCurrentResolver(const QString &musicUrl)
         setResolving(false);
         setErrorString({});
         setStatusText(tr("Resolved %n online source track(s).", nullptr, m_playlistResolvedUrls.size()));
-        emit musicUrlsResolved(m_playlistResolvedUrls);
+        if (!m_playlistResolvedTracks.isEmpty())
+            emit musicTracksResolved(m_playlistResolvedTracks);
+        else
+            emit musicUrlsResolved(m_playlistResolvedUrls);
         return;
     }
 
     setResolving(false);
     setErrorString({});
     setStatusText(tr("Resolved playback URL."));
-    emit musicUrlResolved(musicUrl);
+    if (!resolvedTrack.isEmpty())
+        emit musicTracksResolved(QVariantList { resolvedTrack });
+    else
+        emit musicUrlResolved(musicUrl);
 }
 
 void MusicSourceRegistry::importRemoteScript(const QUrl &scriptUrl)
@@ -1219,4 +1400,27 @@ QString MusicSourceRegistry::scriptMd5(const QString &value) const
 {
     const QByteArray digest = QCryptographicHash::hash(value.toUtf8(), QCryptographicHash::Md5);
     return QString::fromLatin1(digest.toHex());
+}
+
+QString MusicSourceRegistry::scriptMd5FromBase64(const QString &base64Value) const
+{
+    const QByteArray bytes = QByteArray::fromBase64(base64Value.toLatin1());
+    const QByteArray digest = QCryptographicHash::hash(bytes, QCryptographicHash::Md5);
+    return QString::fromLatin1(digest.toHex());
+}
+
+QString MusicSourceRegistry::scriptBufferFromBase64(
+    const QString &value,
+    const QString &encoding) const
+{
+    return QString::fromLatin1(scriptBufferBytesFromText(value, encoding).toBase64());
+}
+
+QString MusicSourceRegistry::scriptBufferToStringFromBase64(
+    const QString &base64Value,
+    const QString &encoding) const
+{
+    return scriptBufferTextFromBytes(
+        QByteArray::fromBase64(base64Value.toLatin1()),
+        encoding);
 }

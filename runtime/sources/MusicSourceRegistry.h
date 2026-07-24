@@ -72,6 +72,13 @@ public:
     Q_INVOKABLE void scriptResolve(const QJSValue &value);
     Q_INVOKABLE void scriptReject(const QJSValue &value);
     Q_INVOKABLE QString scriptMd5(const QString &value) const;
+    Q_INVOKABLE QString scriptMd5FromBase64(const QString &base64Value) const;
+    Q_INVOKABLE QString scriptBufferFromBase64(
+        const QString &value,
+        const QString &encoding) const;
+    Q_INVOKABLE QString scriptBufferToStringFromBase64(
+        const QString &base64Value,
+        const QString &encoding) const;
 
     struct OnlineTrack
     {
@@ -92,6 +99,7 @@ signals:
     void statusChanged();
     void musicUrlResolved(const QString &url);
     void musicUrlsResolved(const QStringList &urls);
+    void musicTracksResolved(const QVariantList &tracks);
 
 private:
     struct ResolveRequest
@@ -136,8 +144,11 @@ private:
     QList<OnlineTrack> m_onlineTracks;
     std::unique_ptr<QJSEngine> m_scriptEngine;
     ResolveRequest m_resolveRequest;
+    std::optional<OnlineTrack> m_pendingOnlineTrack;
     QList<ResolveRequest> m_playlistRequests;
+    QList<OnlineTrack> m_playlistTracks;
     QStringList m_playlistResolvedUrls;
+    QVariantList m_playlistResolvedTracks;
     int m_pendingRequests = 0;
     int m_lastBatchImported = 0;
     int m_resolveGeneration = 0;

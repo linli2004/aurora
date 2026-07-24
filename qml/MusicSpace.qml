@@ -303,6 +303,12 @@ Item {
             root.sourcePanelExpanded = false
             root.tracksPanelExpanded = false
         }
+
+        function onMusicTracksResolved(tracks) {
+            AudioRuntime.setQueueWithMetadata(tracks)
+            root.sourcePanelExpanded = false
+            root.tracksPanelExpanded = false
+        }
     }
 
     MouseArea {

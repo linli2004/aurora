@@ -16,8 +16,10 @@ private slots:
     void parsesOneLineLxScriptMetadata();
     void importsLocalScriptFileOnce();
     void exposesDefaultOnlineTracks();
+    void encodesLxBufferLikeNodeForHeaders();
     void resolvesMockScriptMusicUrl();
     void resolvesMockOnlineTrackMusicUrl();
+    void resolvesMockOnlinePlaylistWithMetadata();
     void resolvesConfiguredRealSourceMusicUrl();
 };
 
@@ -95,6 +97,19 @@ void MusicSourceRegistryTest::exposesDefaultOnlineTracks()
     QVERIFY(firstTrack.value(QStringLiteral("requestText")).toString().startsWith(QStringLiteral("wy:")));
 }
 
+void MusicSourceRegistryTest::encodesLxBufferLikeNodeForHeaders()
+{
+    MusicSourceRegistry registry;
+
+    const QString textBytes = registry.scriptBufferFromBase64(QStringLiteral("Aurora"), QStringLiteral("utf8"));
+    QCOMPARE(registry.scriptBufferToStringFromBase64(textBytes, QStringLiteral("hex")),
+             QStringLiteral("4175726f7261"));
+
+    const QString invalidHex = QStringLiteral("[\n \"33894312\",\n \"128k\"\n]");
+    const QString invalidHexBytes = registry.scriptBufferFromBase64(invalidHex, QStringLiteral("hex"));
+    QCOMPARE(registry.scriptBufferToStringFromBase64(invalidHexBytes, QStringLiteral("hex")), QString());
+}
+
 void MusicSourceRegistryTest::resolvesMockScriptMusicUrl()
 {
     QCoreApplication::setOrganizationName(QStringLiteral("AuroraTests"));
@@ -166,7 +181,7 @@ void MusicSourceRegistryTest::resolvesMockOnlineTrackMusicUrl()
     QCOMPARE(registry.sourceCount(), 1);
     QVERIFY(registry.onlineTrackCount() > 0);
 
-    QSignalSpy resolvedSpy(&registry, &MusicSourceRegistry::musicUrlResolved);
+    QSignalSpy resolvedSpy(&registry, &MusicSourceRegistry::musicTracksResolved);
     registry.resolveOnlineTrackAt(0);
 
     QVERIFY2(
@@ -174,7 +189,63 @@ void MusicSourceRegistryTest::resolvesMockOnlineTrackMusicUrl()
         qPrintable(QStringLiteral("error=%1 status=%2 resolving=%3")
                        .arg(registry.errorString(), registry.statusText())
                        .arg(registry.resolving())));
-    QCOMPARE(resolvedSpy.takeFirst().at(0).toString(), QStringLiteral("https://example.com/online.mp3"));
+    const QVariantList resolvedTracks = resolvedSpy.takeFirst().at(0).toList();
+    QCOMPARE(resolvedTracks.size(), 1);
+    const QVariantMap resolvedTrack = resolvedTracks.first().toMap();
+    const QVariantMap catalogTrack = registry.onlineTracks().first().toMap();
+    QCOMPARE(resolvedTrack.value(QStringLiteral("url")).toString(), QStringLiteral("https://example.com/online.mp3"));
+    QCOMPARE(resolvedTrack.value(QStringLiteral("title")).toString(), catalogTrack.value(QStringLiteral("title")).toString());
+    QCOMPARE(resolvedTrack.value(QStringLiteral("artist")).toString(), catalogTrack.value(QStringLiteral("artist")).toString());
+    QVERIFY(!registry.resolving());
+}
+
+void MusicSourceRegistryTest::resolvesMockOnlinePlaylistWithMetadata()
+{
+    QCoreApplication::setOrganizationName(QStringLiteral("AuroraTests"));
+    QCoreApplication::setApplicationName(
+        QStringLiteral("MusicSourceOnlinePlaylist-%1").arg(QUuid::createUuid().toString(QUuid::Id128)));
+    QSettings().clear();
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString filePath = directory.filePath(QStringLiteral("resolver.js"));
+    QFile file(filePath);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+    file.write(
+        "/** * @name Resolver * @version 1 */ "
+        "const { EVENT_NAMES, on, send } = globalThis.lx; "
+        "on(EVENT_NAMES.request, ({ action, source, info }) => { "
+        "  const songId = info.musicInfo.hash ?? info.musicInfo.songmid; "
+        "  if (action !== 'musicUrl') return Promise.reject(new Error('bad action')); "
+        "  if (source !== 'wy' || info.type !== '128k') return Promise.reject(new Error('bad request')); "
+        "  return Promise.resolve('https://example.com/' + songId + '.mp3'); "
+        "}); "
+        "send(EVENT_NAMES.inited, { sources: { wy: { name: 'wy', type: 'music', actions: ['musicUrl'], qualitys: ['128k'] } } });");
+    file.close();
+
+    MusicSourceRegistry registry;
+    registry.importFromText(filePath);
+    QCOMPARE(registry.sourceCount(), 1);
+
+    QSignalSpy resolvedSpy(&registry, &MusicSourceRegistry::musicTracksResolved);
+    registry.resolveOnlineTracksFrom(0);
+
+    QVERIFY2(
+        resolvedSpy.wait(5000),
+        qPrintable(QStringLiteral("error=%1 status=%2 resolving=%3")
+                       .arg(registry.errorString(), registry.statusText())
+                       .arg(registry.resolving())));
+
+    const QVariantList resolvedTracks = resolvedSpy.takeFirst().at(0).toList();
+    QCOMPARE(resolvedTracks.size(), qMin(24, registry.onlineTrackCount()));
+    const QVariantMap firstResolvedTrack = resolvedTracks.first().toMap();
+    const QVariantMap firstCatalogTrack = registry.onlineTracks().first().toMap();
+    QCOMPARE(firstResolvedTrack.value(QStringLiteral("title")).toString(),
+             firstCatalogTrack.value(QStringLiteral("title")).toString());
+    QCOMPARE(firstResolvedTrack.value(QStringLiteral("artist")).toString(),
+             firstCatalogTrack.value(QStringLiteral("artist")).toString());
+    QVERIFY(firstResolvedTrack.value(QStringLiteral("url")).toString().startsWith(QStringLiteral("https://example.com/")));
     QVERIFY(!registry.resolving());
 }
 
