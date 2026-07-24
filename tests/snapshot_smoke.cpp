@@ -11,6 +11,7 @@
 #include "runtime/AuroraStateMapper.h"
 #include "runtime/AuroraTypes.h"
 #include "runtime/audio/AudioRuntime.h"
+#include "runtime/memory/MomentService.h"
 #include "runtime/library/LocalLibraryService.h"
 
 int main(int argc, char *argv[])
@@ -54,6 +55,15 @@ int main(int argc, char *argv[])
         "LocalLibrary",
         [](QQmlEngine *, QJSEngine *) -> QObject * {
             return new LocalLibraryService;
+        });
+
+    qmlRegisterSingletonType<MomentService>(
+        "Aurora.Runtime",
+        1,
+        0,
+        "Moments",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new MomentService;
         });
 
     QQmlApplicationEngine engine;
