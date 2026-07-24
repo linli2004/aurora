@@ -152,7 +152,7 @@ Item {
     }
 
     function playOnlineTrack(index) {
-        MusicSources.resolveOnlineTrackAt(index)
+        MusicSources.resolveOnlineTracksFrom(index)
         sourceInput.focus = false
     }
 
