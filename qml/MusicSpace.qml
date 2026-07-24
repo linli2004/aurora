@@ -293,8 +293,11 @@ Item {
         anchors.leftMargin: 28
         anchors.topMargin: 82
         width: 246
-        height: libraryMenuExpanded ? (LocalLibrary.firstRun ? 184 : 150) : 42
-    Rectangle {
+        height: libraryMenuExpanded
+                ? ((LocalLibrary.firstRun || LocalLibrary.libraryRootCount > 0) ? 184 : 150)
+                : 42
+
+        Rectangle {
             id: libraryMenuButton
             width: 150
             height: 42
@@ -331,8 +334,8 @@ Item {
             anchors.top: libraryMenuButton.bottom
             anchors.topMargin: 8
             width: parent.width
-            height: LocalLibrary.firstRun ? 134 : 100
-        visible: root.libraryMenuExpanded
+            height: LocalLibrary.firstRun || LocalLibrary.libraryRootCount > 0 ? 134 : 100
+            visible: root.libraryMenuExpanded
             opacity: root.libraryMenuExpanded ? 1 : 0
             radius: 8
             color: Qt.rgba(0.04, 0.05, 0.07, 0.74)
@@ -346,8 +349,15 @@ Item {
 
                 Text {
                     width: parent.width
-                    text: LocalLibrary.lastScanStatus.length > 0 ? LocalLibrary.lastScanStatus + (LocalLibrary.scanning ? " · " + LocalLibrary.scannedFileCount + " files" : "") : (LocalLibrary.firstRun ? root.firstRunLibraryMessage : LocalLibrary.trackCount + " tracks ready")
-                color: LocalLibrary.errorString.length > 0
+                    text: LocalLibrary.lastScanStatus.length > 0
+                          ? LocalLibrary.lastScanStatus
+                            + (LocalLibrary.scanning
+                               ? " · " + LocalLibrary.scannedFileCount + " files"
+                               : "")
+                          : (LocalLibrary.firstRun
+                             ? root.firstRunLibraryMessage
+                             : LocalLibrary.trackCount + " tracks ready")
+                    color: LocalLibrary.errorString.length > 0
                            ? AuroraTokens.warmAccent
                            : AuroraTokens.textMuted
                     font.pixelSize: 11
@@ -369,12 +379,27 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: LocalLibrary.scanning ? "Cancel scan" : (LocalLibrary.firstRun && LocalLibrary.defaultMusicDirectoryAvailable ? "Scan Music" : "Scan folder")
-                    color: AuroraTokens.textSecondary
+                            text: LocalLibrary.scanning
+                                  ? "Cancel scan"
+                                  : (LocalLibrary.firstRun
+                                     && LocalLibrary.defaultMusicDirectoryAvailable
+                                     ? "Scan Music"
+                                     : "Add folder")
+                            color: AuroraTokens.textSecondary
                             font.pixelSize: 11
                         }
 
-                        TapHandler { onTapped: { if (LocalLibrary.scanning) LocalLibrary.cancelScan(); else if (LocalLibrary.firstRun && LocalLibrary.defaultMusicDirectoryAvailable) LocalLibrary.scanDefaultMusicDirectory(); else libraryDialog.open() } }
+                        TapHandler {
+                            onTapped: {
+                                if (LocalLibrary.scanning)
+                                    LocalLibrary.cancelScan()
+                                else if (LocalLibrary.firstRun
+                                         && LocalLibrary.defaultMusicDirectoryAvailable)
+                                    LocalLibrary.scanDefaultMusicDirectory()
+                                else
+                                    libraryDialog.open()
+                            }
+                        }
                     }
 
                     Rectangle {
@@ -391,12 +416,66 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: LocalLibrary.sourceCount > 0 ? "Play library" : "Choose folder"
-                    color: AuroraTokens.textSecondary
+                            text: LocalLibrary.sourceCount > 0
+                                  ? "Play library"
+                                  : "Choose folder"
+                            color: AuroraTokens.textSecondary
                             font.pixelSize: 11
                         }
 
-                        TapHandler { enabled: LocalLibrary.sourceCount > 0 || !LocalLibrary.scanning; onTapped: { if (LocalLibrary.sourceCount > 0) AudioRuntime.setQueue(LocalLibrary.playableUrls()); else libraryDialog.open() } }
+                        TapHandler {
+                            enabled: LocalLibrary.sourceCount > 0
+                                     || !LocalLibrary.scanning
+                            onTapped: {
+                                if (LocalLibrary.sourceCount > 0)
+                                    AudioRuntime.setQueue(LocalLibrary.playableUrls())
+                                else
+                                    libraryDialog.open()
+                            }
+                        }
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 8
+                    visible: LocalLibrary.libraryRootCount > 0
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - 92
+                        text: LocalLibrary.libraryRootsSummary
+                        color: LocalLibrary.unavailableRootCount > 0
+                               ? AuroraTokens.warmAccent
+                               : AuroraTokens.textMuted
+                        font.pixelSize: 10
+                        elide: Text.ElideMiddle
+                    }
+
+                    Rectangle {
+                        width: 84
+                        height: 30
+                        radius: 15
+                        color: LocalLibrary.scanning
+                               ? Qt.rgba(1, 1, 1, 0.045)
+                               : Qt.rgba(root.displayIdentityColor.r,
+                                         root.displayIdentityColor.g,
+                                         root.displayIdentityColor.b, 0.14)
+                        border.width: 1
+                        border.color: Qt.rgba(1, 1, 1, 0.10)
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Rescan all"
+                            color: AuroraTokens.textSecondary
+                            font.pixelSize: 10
+                        }
+
+                        TapHandler {
+                            enabled: !LocalLibrary.scanning
+                            onTapped: LocalLibrary.rescanLibraryRoots()
+                        }
                     }
                 }
             }

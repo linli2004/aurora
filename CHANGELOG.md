@@ -22,6 +22,8 @@
 - Added missing-source reconciliation and stable Track relink after local file moves.
 - Active library counts and playable lists now exclude unavailable source rows.
 - Track-oriented library queries now project one preferred Available source per stable Track.
+- Persisted normalized library roots in `library.roots.v1`.
+- Added multi-folder Rescan all with unavailable-root reporting and post-scan source reconciliation.
 - Added repository tests for schema creation, TrackSource persistence and duplicate content.
 - Added repository tests for track search and settings persistence.
 - Added stable local Track ID generation from bounded file-content sampling.

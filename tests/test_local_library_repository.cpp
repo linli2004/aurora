@@ -17,6 +17,7 @@ private slots:
     void marksMissingSourcesUnavailable();
     void movedFileRelinksByStableTrackIdentity();
     void readsTracksWithSearchText();
+    void persistsLibraryRoots();
     void persistsSettings();
 };
 
@@ -175,6 +176,40 @@ void LocalLibraryRepositoryTest::readsTracksWithSearchText()
 
     QCOMPARE(repository.tracks(QStringLiteral("night")).size(), 1);
     QCOMPARE(repository.tracks(QStringLiteral("missing")).size(), 0);
+}
+
+
+void LocalLibraryRepositoryTest::persistsLibraryRoots()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString firstRoot = directory.filePath(QStringLiteral("A"));
+    const QString secondRoot = directory.filePath(QStringLiteral("B"));
+    QVERIFY(QDir().mkpath(firstRoot));
+    QVERIFY(QDir().mkpath(secondRoot));
+
+    const QString databasePath = directory.filePath(QStringLiteral("library.sqlite"));
+    {
+        LocalLibraryRepository repository(
+            QStringLiteral("aurora-repo-test-roots-write"));
+        QVERIFY(repository.open(databasePath));
+        QVERIFY2(
+            repository.setLibraryRoots({secondRoot, firstRoot, firstRoot}),
+            qPrintable(repository.lastError()));
+    }
+
+    LocalLibraryRepository repository(
+        QStringLiteral("aurora-repo-test-roots-read"));
+    QVERIFY(repository.open(databasePath));
+
+    QStringList expected {
+        QFileInfo(firstRoot).canonicalFilePath(),
+        QFileInfo(secondRoot).canonicalFilePath(),
+    };
+    expected.sort(Qt::CaseInsensitive);
+
+    QCOMPARE(repository.libraryRoots(), expected);
 }
 
 void LocalLibraryRepositoryTest::persistsSettings()
