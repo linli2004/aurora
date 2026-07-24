@@ -18,7 +18,7 @@ class LocalLibraryService final : public QObject
     Q_PROPERTY(int sourceCount READ sourceCount NOTIFY libraryChanged)
     Q_PROPERTY(QString databasePath READ databasePath CONSTANT)
     Q_PROPERTY(QString lastScanStatus READ lastScanStatus NOTIFY scanStatusChanged)
-    Q_PROPERTY(QString errorString READ errorString NOTIFY errorChanged)
+    Q_PROPERTY(QString errorString READ errorString NOTIFY errorChanged) Q_PROPERTY(bool firstRun READ firstRun NOTIFY libraryChanged) Q_PROPERTY(QUrl defaultMusicDirectory READ defaultMusicDirectory CONSTANT) Q_PROPERTY(QString defaultMusicDirectoryLabel READ defaultMusicDirectoryLabel CONSTANT) Q_PROPERTY(bool defaultMusicDirectoryAvailable READ defaultMusicDirectoryAvailable CONSTANT)
     Q_PROPERTY(int scannedFileCount READ scannedFileCount NOTIFY scanProgressChanged)
     Q_PROPERTY(QString searchText READ searchText WRITE setSearchText NOTIFY searchChanged)
     Q_PROPERTY(int visibleTrackCount READ visibleTrackCount NOTIFY tracksChanged)
@@ -32,13 +32,13 @@ public:
     [[nodiscard]] int sourceCount() const;
     [[nodiscard]] QString databasePath() const;
     [[nodiscard]] QString lastScanStatus() const;
-    [[nodiscard]] QString errorString() const;
+    [[nodiscard]] QString errorString() const; [[nodiscard]] bool firstRun() const; [[nodiscard]] QUrl defaultMusicDirectory() const; [[nodiscard]] QString defaultMusicDirectoryLabel() const; [[nodiscard]] bool defaultMusicDirectoryAvailable() const;
     [[nodiscard]] int scannedFileCount() const;
     [[nodiscard]] QString searchText() const;
     [[nodiscard]] int visibleTrackCount() const;
     [[nodiscard]] QAbstractListModel *tracks();
 
-    Q_INVOKABLE void scanDirectory(const QUrl &directory);
+    Q_INVOKABLE void scanDirectory(const QUrl &directory); Q_INVOKABLE void scanDefaultMusicDirectory();
     Q_INVOKABLE void cancelScan();
     Q_INVOKABLE QVariantList playableUrls() const;
     Q_INVOKABLE QVariantList visiblePlayableUrls() const;
@@ -64,7 +64,7 @@ private:
     void setErrorString(const QString &message);
     void setScannedFileCount(int count);
 
-    QString m_databasePath;
+    QString m_databasePath; QUrl m_defaultMusicDirectory; QString m_defaultMusicDirectoryLabel; bool m_defaultMusicDirectoryAvailable = false;
     LocalLibraryTrackModel m_trackModel;
     std::shared_ptr<std::atomic_bool> m_cancelScan;
     bool m_scanning = false;

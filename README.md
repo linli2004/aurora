@@ -29,6 +29,7 @@ Implemented as an initial scaffold:
 - Playback session restore for queue, current index, volume and track position
 - Minimal MPRIS integration for Ubuntu / GNOME media controls
 - Desktop identity packaging with a local `.desktop` entry and hicolor SVG icon
+- First-run library guidance with one-step Music folder scanning
 - Embedded artwork extraction with a trusted Generated Identity fallback
 - Decoded-audio feature analysis for level, bass, mid, high and transient presence
 - Audio-reactive Atmosphere with Reduced Motion and Eco fallbacks
@@ -92,7 +93,8 @@ cmake --build --preset dev
 4. Use **Cancel** during a long scan if needed.
 5. Open **Tracks**, search the library, click a row to play from that track, or select **Play list**.
 6. Play beyond the opening seconds, restart Aurora, and confirm the queue, current track, volume and position return without autoplay.
-7. While a track is loaded, run `playerctl -l` and confirm Aurora is exposed as an MPRIS player.
+7. On a fresh library, open Library and choose Scan Music or Choose folder to start first-run setup.
+8. While a track is loaded, run `playerctl -l` and confirm Aurora is exposed as an MPRIS player.
 
 ## Local Desktop Install
 
