@@ -28,6 +28,7 @@ Implemented as an initial scaffold:
 - Button-expanded local library browser with search and click-to-play queue creation
 - Playback session restore for queue, current index, volume and track position
 - Minimal MPRIS integration for Ubuntu / GNOME media controls
+- Desktop identity packaging with a local `.desktop` entry and hicolor SVG icon
 - Embedded artwork extraction with a trusted Generated Identity fallback
 - Decoded-audio feature analysis for level, bass, mid, high and transient presence
 - Audio-reactive Atmosphere with Reduced Motion and Eco fallbacks
@@ -92,6 +93,27 @@ cmake --build --preset dev
 5. Open **Tracks**, search the library, click a row to play from that track, or select **Play list**.
 6. Play beyond the opening seconds, restart Aurora, and confirm the queue, current track, volume and position return without autoplay.
 7. While a track is loaded, run `playerctl -l` and confirm Aurora is exposed as an MPRIS player.
+
+## Local Desktop Install
+
+Configure the Release build with a local prefix, then install Aurora into the
+current user's desktop environment:
+
+```bash
+rm -rf build/release
+cmake --preset release -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+cmake --build --preset release
+cmake --install build/release --prefix "$HOME/.local"
+```
+
+Optional desktop database refresh:
+
+```bash
+desktop-file-validate "$HOME/.local/share/applications/aurora.desktop"
+gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" || true
+update-desktop-database "$HOME/.local/share/applications" || true
+gtk-launch aurora
+```
 
 ## Run Tests
 

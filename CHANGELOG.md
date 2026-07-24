@@ -15,6 +15,8 @@
 - Added bounded retry handling for multimedia backends that ignore the first seek request.
 - Added minimal MPRIS service registration for Ubuntu media controls.
 - Exposed Play/Pause, Next, Previous, Stop, Seek, metadata, volume and playback status over D-Bus.
+- Added Linux desktop identity packaging with `aurora.desktop` and a scalable hicolor SVG icon.
+- Added CMake install rules for the Aurora binary, desktop entry and app icon.
 - Added repository tests for schema creation, TrackSource persistence and duplicate content.
 - Added repository tests for track search and settings persistence.
 - Added stable local Track ID generation from bounded file-content sampling.

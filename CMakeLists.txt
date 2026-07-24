@@ -13,6 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick Multimedia Sql DBus)
 
 qt_standard_project_setup(REQUIRES 6.8)
+include(GNUInstallDirs)
 
 qt_add_executable(aurora
     app/main.cpp
@@ -103,6 +104,26 @@ target_link_libraries(aurora PRIVATE
 set_target_properties(aurora PROPERTIES
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
+)
+
+
+configure_file(
+    packaging/linux/aurora.desktop.in
+    "${CMAKE_CURRENT_BINARY_DIR}/aurora.desktop"
+    @ONLY
+)
+
+install(TARGETS aurora
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/aurora.desktop"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
+)
+
+install(FILES packaging/linux/aurora.svg
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps"
+    RENAME aurora.svg
 )
 
 include(CTest)
