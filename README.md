@@ -27,6 +27,7 @@ Implemented as an initial scaffold:
 - Scanner progress, cancellation and repository-backed track list refresh
 - Button-expanded local library browser with search and click-to-play queue creation
 - Playback session restore for queue, current index, volume and track position
+- Minimal MPRIS integration for Ubuntu / GNOME media controls
 - Embedded artwork extraction with a trusted Generated Identity fallback
 - Decoded-audio feature analysis for level, bass, mid, high and transient presence
 - Audio-reactive Atmosphere with Reduced Motion and Eco fallbacks
@@ -43,7 +44,7 @@ Deferred:
 - Production Memory persistence
 - Online music providers
 - Final shaders and refraction
-- GNOME Shell integration
+- Deeper GNOME Shell integration, desktop activation and packaging
 
 ## Requirements
 
@@ -90,6 +91,7 @@ cmake --build --preset dev
 4. Use **Cancel** during a long scan if needed.
 5. Open **Tracks**, search the library, click a row to play from that track, or select **Play list**.
 6. Play beyond the opening seconds, restart Aurora, and confirm the queue, current track, volume and position return without autoplay.
+7. While a track is loaded, run `playerctl -l` and confirm Aurora is exposed as an MPRIS player.
 
 ## Run Tests
 
