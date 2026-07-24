@@ -27,7 +27,10 @@ class MusicSourceRegistry final : public QObject
     Q_PROPERTY(QVariantList sources READ sources NOTIFY sourcesChanged)
     Q_PROPERTY(QStringList sourceNames READ sourceNames NOTIFY sourcesChanged)
     Q_PROPERTY(int sourceCount READ sourceCount NOTIFY sourcesChanged)
+    Q_PROPERTY(QVariantList onlineTracks READ onlineTracks NOTIFY onlineTracksChanged)
+    Q_PROPERTY(int onlineTrackCount READ onlineTrackCount NOTIFY onlineTracksChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
+    Q_PROPERTY(bool catalogBusy READ catalogBusy NOTIFY catalogBusyChanged)
     Q_PROPERTY(bool resolving READ resolving NOTIFY resolvingChanged)
     Q_PROPERTY(QString statusText READ statusText NOTIFY statusChanged)
     Q_PROPERTY(QString errorString READ errorString NOTIFY statusChanged)
@@ -38,14 +41,20 @@ public:
     [[nodiscard]] QVariantList sources() const;
     [[nodiscard]] QStringList sourceNames() const;
     [[nodiscard]] int sourceCount() const;
+    [[nodiscard]] QVariantList onlineTracks() const;
+    [[nodiscard]] int onlineTrackCount() const;
     [[nodiscard]] bool busy() const;
+    [[nodiscard]] bool catalogBusy() const;
     [[nodiscard]] bool resolving() const;
     [[nodiscard]] QString statusText() const;
     [[nodiscard]] QString errorString() const;
 
     Q_INVOKABLE void importFromText(const QString &sourceText);
+    Q_INVOKABLE void loadOnlineTracks();
     Q_INVOKABLE void resolveFromText(const QString &requestText);
     Q_INVOKABLE void resolveDemoTrack();
+    Q_INVOKABLE void resolveOnlineTrackAt(int index);
+    Q_INVOKABLE void resolveOnlineTracksFrom(int index);
     Q_INVOKABLE void clearSources();
 
     [[nodiscard]] static QStringList entriesFromText(const QString &sourceText);
@@ -64,12 +73,25 @@ public:
     Q_INVOKABLE void scriptReject(const QJSValue &value);
     Q_INVOKABLE QString scriptMd5(const QString &value) const;
 
+    struct OnlineTrack
+    {
+        QString source;
+        QString songId;
+        QString title;
+        QString artist;
+        QString album;
+        QString artworkUrl;
+    };
+
 signals:
     void sourcesChanged();
+    void onlineTracksChanged();
     void busyChanged();
+    void catalogBusyChanged();
     void resolvingChanged();
     void statusChanged();
     void musicUrlResolved(const QString &url);
+    void musicUrlsResolved(const QStringList &urls);
 
 private:
     struct ResolveRequest
@@ -86,6 +108,9 @@ private:
     void finishRemoteImport(bool imported);
     [[nodiscard]] std::optional<ResolveRequest> parseResolveRequest(
         const QString &requestText) const;
+    [[nodiscard]] std::optional<ResolveRequest> resolveRequestForOnlineTrack(int index) const;
+    void startResolveRequest(const ResolveRequest &request);
+    void continuePlaylistResolve();
     void resolveWithSourceAt(int index);
     void loadScriptForResolve(const MusicSourceRecord &record, int index);
     void evaluateScriptForResolve(
@@ -101,19 +126,25 @@ private:
     void failCurrentResolver(const QString &message);
     void finishCurrentResolver(const QString &musicUrl);
     void setBusy(bool busy);
+    void setCatalogBusy(bool busy);
     void setResolving(bool resolving);
     void setStatusText(const QString &message);
     void setErrorString(const QString &message);
 
     QNetworkAccessManager m_network;
     QList<MusicSourceRecord> m_sources;
+    QList<OnlineTrack> m_onlineTracks;
     std::unique_ptr<QJSEngine> m_scriptEngine;
     ResolveRequest m_resolveRequest;
+    QList<ResolveRequest> m_playlistRequests;
+    QStringList m_playlistResolvedUrls;
     int m_pendingRequests = 0;
     int m_lastBatchImported = 0;
     int m_resolveGeneration = 0;
     bool m_busy = false;
+    bool m_catalogBusy = false;
     bool m_resolving = false;
+    bool m_resolvingPlaylist = false;
     QString m_statusText;
     QString m_errorString;
 };

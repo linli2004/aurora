@@ -14,6 +14,7 @@ Item {
     property bool flowSceneEnabled: true
     property bool libraryMenuExpanded: false
     property bool tracksPanelExpanded: false
+    property bool sourceTracksMode: true
     property bool sourcePanelExpanded: false
     property bool controlMode: false
     property bool momentFeedbackVisible: false
@@ -34,6 +35,8 @@ Item {
     readonly property real progressRatio:
         AudioRuntime.duration > 0 ? Math.min(1, AudioRuntime.position / AudioRuntime.duration) : 0
     readonly property bool libraryBrowserAvailable: LocalLibrary.sourceCount > 0 || LocalLibrary.searchText.length > 0
+    readonly property int visiblePanelTrackCount:
+        root.sourceTracksMode ? MusicSources.onlineTrackCount : LocalLibrary.visibleTrackCount
     readonly property bool forceControlsVisible: false
     readonly property bool controlsVisible:
         root.forceControlsVisible
@@ -148,6 +151,11 @@ Item {
         sourceInput.focus = false
     }
 
+    function playOnlineTrack(index) {
+        MusicSources.resolveOnlineTrackAt(index)
+        sourceInput.focus = false
+    }
+
     function beginTrackTransition(direction) {
         if (liquidTrackTransition.running || AudioRuntime.queueCount < 2)
             return
@@ -216,6 +224,7 @@ Item {
 
     onVisibleChanged: {
         if (visible) {
+            MusicSources.loadOnlineTracks()
             root.controlMode = root.forceControlsVisible
             forceActiveFocus()
         }
@@ -286,6 +295,13 @@ Item {
         function onMusicUrlResolved(url) {
             AudioRuntime.setQueueFromText(url)
             root.sourcePanelExpanded = false
+            root.tracksPanelExpanded = false
+        }
+
+        function onMusicUrlsResolved(urls) {
+            AudioRuntime.setQueueFromText(urls.join("\n"))
+            root.sourcePanelExpanded = false
+            root.tracksPanelExpanded = false
         }
     }
 
@@ -1132,9 +1148,12 @@ Item {
 
             Text {
                 anchors.centerIn: parent
-                text: root.libraryBrowserAvailable
-                      ? AuroraI18n.text("music.tracks") + " · " + LocalLibrary.visibleTrackCount
-                      : AuroraI18n.text("music.tracks")
+                text: (root.sourceTracksMode
+                       ? AuroraI18n.text("music.sourceTracks")
+                       : AuroraI18n.text("music.tracks"))
+                      + (root.visiblePanelTrackCount > 0
+                         ? " · " + root.visiblePanelTrackCount
+                         : "")
                 color: root.mangaText
                 font.pixelSize: 13
                 font.weight: Font.DemiBold
@@ -1169,8 +1188,10 @@ Item {
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - 96
-                        text: AuroraI18n.text("music.tracks")
+                        width: parent.width - 154
+                        text: root.sourceTracksMode
+                              ? AuroraI18n.text("music.sourceTracks")
+                              : AuroraI18n.text("music.tracks")
                         color: root.mangaText
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
@@ -1178,10 +1199,41 @@ Item {
                     }
 
                     Rectangle {
-                        width: 88
+                        width: 60
                         height: 28
                         radius: 14
-                        color: LocalLibrary.visibleTrackCount > 0
+                        color: MusicSources.onlineTrackCount > 0
+                               ? Qt.rgba(root.displayIdentityColor.r,
+                                         root.displayIdentityColor.g,
+                                         root.displayIdentityColor.b, 0.18)
+                               : AuroraTokens.mangaWash
+                        border.width: 2
+                        border.color: AuroraTokens.mangaInk
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: root.sourceTracksMode
+                                  ? AuroraI18n.text("music.localTracks")
+                                  : AuroraI18n.text("music.sourceShort")
+                            color: root.mangaText
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                        }
+
+                        TapHandler {
+                            onTapped: {
+                                root.sourceTracksMode = !root.sourceTracksMode
+                                if (root.sourceTracksMode)
+                                    MusicSources.loadOnlineTracks()
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 78
+                        height: 28
+                        radius: 14
+                        color: root.visiblePanelTrackCount > 0 && !MusicSources.resolving
                                ? Qt.rgba(root.displayIdentityColor.r,
                                          root.displayIdentityColor.g,
                                          root.displayIdentityColor.b, 0.18)
@@ -1198,15 +1250,21 @@ Item {
                         }
 
                         TapHandler {
-                            enabled: LocalLibrary.visibleTrackCount > 0
-                            onTapped: AudioRuntime.setQueue(LocalLibrary.visiblePlayableUrls())
+                            enabled: root.visiblePanelTrackCount > 0 && !MusicSources.resolving
+                            onTapped: {
+                                if (root.sourceTracksMode)
+                                    MusicSources.resolveOnlineTracksFrom(0)
+                                else
+                                    AudioRuntime.setQueue(LocalLibrary.visiblePlayableUrls())
+                            }
                         }
                     }
                 }
 
                 Rectangle {
                     width: parent.width
-                    height: 34
+                    height: root.sourceTracksMode ? 0 : 34
+                    visible: !root.sourceTracksMode
                     radius: 8
                     color: AuroraTokens.mangaPaper
                     border.width: 2
@@ -1243,7 +1301,8 @@ Item {
                 ListView {
                     id: libraryList
                     width: parent.width
-                    height: parent.height - 90
+                    height: root.sourceTracksMode ? 0 : parent.height - 90
+                    visible: !root.sourceTracksMode
                     model: LocalLibrary.tracks
                     clip: true
                     spacing: 6
@@ -1321,6 +1380,83 @@ Item {
                                  ? AuroraI18n.text("music.scanToBegin")
                                  : AuroraI18n.text("music.noTracks"))
                             color: root.mangaMutedText
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                    }
+                }
+
+                ListView {
+                    id: onlineList
+                    width: parent.width
+                    height: root.sourceTracksMode ? parent.height - 46 : 0
+                    visible: root.sourceTracksMode
+                    model: MusicSources.onlineTracks
+                    clip: true
+                    spacing: 6
+
+                    delegate: Rectangle {
+                        required property int index
+                        required property string source
+                        required property string songId
+                        required property string title
+                        required property string artist
+                        required property string album
+
+                        width: onlineList.width
+                        height: 58
+                        radius: 8
+                        color: Qt.rgba(AuroraTokens.mangaInk.r,
+                                       AuroraTokens.mangaInk.g,
+                                       AuroraTokens.mangaInk.b,
+                                       0.045)
+                        border.width: 2
+                        border.color: Qt.rgba(AuroraTokens.mangaInk.r,
+                                              AuroraTokens.mangaInk.g,
+                                              AuroraTokens.mangaInk.b,
+                                              0.20)
+
+                        Column {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 10
+                            spacing: 4
+
+                            Text {
+                                width: parent.width
+                                text: title
+                                color: root.mangaText
+                                font.pixelSize: 12
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                width: parent.width
+                                text: artist.length > 0
+                                      ? artist + (album.length > 0 ? " · " + album : "")
+                                      : source + ":" + songId
+                                color: root.mangaMutedText
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        TapHandler {
+                            enabled: !MusicSources.resolving
+                            onTapped: root.playOnlineTrack(index)
+                        }
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        width: parent.width
+                        horizontalAlignment: Text.AlignHCenter
+                        visible: onlineList.count === 0
+                        text: MusicSources.catalogBusy
+                              ? AuroraI18n.text("music.sourceCatalogLoading")
+                              : AuroraI18n.text("music.noSourceTracks")
+                        color: root.mangaMutedText
                         font.pixelSize: 12
                         wrapMode: Text.Wrap
                     }

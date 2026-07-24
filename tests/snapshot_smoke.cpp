@@ -181,6 +181,16 @@ int main(int argc, char *argv[])
             }
         }
 
+        if (mode == QStringLiteral("music-online-tracks")) {
+            if (QQuickItem *shell = findAppShell(window))
+                shell->setProperty("currentPage", 1);
+            if (QQuickItem *musicSpace = findItemWithProperty(
+                    window->contentItem(), "tracksPanelExpanded")) {
+                musicSpace->setProperty("tracksPanelExpanded", true);
+                musicSpace->setProperty("sourceTracksMode", true);
+            }
+        }
+
         const int settleDelay = mode == QStringLiteral("music-presence") ? 4700 : 900;
         QTimer::singleShot(settleDelay, &app, [&app, window, outputPath]() {
             const QImage image = window->grabWindow();

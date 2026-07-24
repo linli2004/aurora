@@ -15,7 +15,9 @@ private slots:
     void splitsSpaceSeparatedScriptUrls();
     void parsesOneLineLxScriptMetadata();
     void importsLocalScriptFileOnce();
+    void exposesDefaultOnlineTracks();
     void resolvesMockScriptMusicUrl();
+    void resolvesMockOnlineTrackMusicUrl();
     void resolvesConfiguredRealSourceMusicUrl();
 };
 
@@ -81,6 +83,18 @@ void MusicSourceRegistryTest::importsLocalScriptFileOnce()
     QCOMPARE(registry.sourceCount(), 1);
 }
 
+void MusicSourceRegistryTest::exposesDefaultOnlineTracks()
+{
+    MusicSourceRegistry registry;
+    QVERIFY(registry.onlineTrackCount() > 1);
+
+    const QVariantMap firstTrack = registry.onlineTracks().first().toMap();
+    QCOMPARE(firstTrack.value(QStringLiteral("source")).toString(), QStringLiteral("wy"));
+    QVERIFY(!firstTrack.value(QStringLiteral("songId")).toString().isEmpty());
+    QVERIFY(!firstTrack.value(QStringLiteral("title")).toString().isEmpty());
+    QVERIFY(firstTrack.value(QStringLiteral("requestText")).toString().startsWith(QStringLiteral("wy:")));
+}
+
 void MusicSourceRegistryTest::resolvesMockScriptMusicUrl()
 {
     QCoreApplication::setOrganizationName(QStringLiteral("AuroraTests"));
@@ -119,6 +133,48 @@ void MusicSourceRegistryTest::resolvesMockScriptMusicUrl()
                        .arg(registry.errorString(), registry.statusText())
                        .arg(registry.resolving())));
     QCOMPARE(resolvedSpy.takeFirst().at(0).toString(), QStringLiteral("https://example.com/demo.mp3"));
+    QVERIFY(!registry.resolving());
+}
+
+void MusicSourceRegistryTest::resolvesMockOnlineTrackMusicUrl()
+{
+    QCoreApplication::setOrganizationName(QStringLiteral("AuroraTests"));
+    QCoreApplication::setApplicationName(
+        QStringLiteral("MusicSourceOnlineResolver-%1").arg(QUuid::createUuid().toString(QUuid::Id128)));
+    QSettings().clear();
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString filePath = directory.filePath(QStringLiteral("resolver.js"));
+    QFile file(filePath);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+    file.write(
+        "/** * @name Resolver * @version 1 */ "
+        "const { EVENT_NAMES, on, send } = globalThis.lx; "
+        "on(EVENT_NAMES.request, ({ action, source, info }) => { "
+        "  const songId = info.musicInfo.hash ?? info.musicInfo.songmid; "
+        "  if (action !== 'musicUrl') return Promise.reject(new Error('bad action')); "
+        "  if (source !== 'wy' || info.type !== '128k' || songId !== '33894312') return Promise.reject(new Error('bad request')); "
+        "  return Promise.resolve('https://example.com/online.mp3'); "
+        "}); "
+        "send(EVENT_NAMES.inited, { sources: { wy: { name: 'wy', type: 'music', actions: ['musicUrl'], qualitys: ['128k'] } } });");
+    file.close();
+
+    MusicSourceRegistry registry;
+    registry.importFromText(filePath);
+    QCOMPARE(registry.sourceCount(), 1);
+    QVERIFY(registry.onlineTrackCount() > 0);
+
+    QSignalSpy resolvedSpy(&registry, &MusicSourceRegistry::musicUrlResolved);
+    registry.resolveOnlineTrackAt(0);
+
+    QVERIFY2(
+        resolvedSpy.wait(2000),
+        qPrintable(QStringLiteral("error=%1 status=%2 resolving=%3")
+                       .arg(registry.errorString(), registry.statusText())
+                       .arg(registry.resolving())));
+    QCOMPARE(resolvedSpy.takeFirst().at(0).toString(), QStringLiteral("https://example.com/online.mp3"));
     QVERIFY(!registry.resolving());
 }
 

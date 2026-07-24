@@ -63,6 +63,36 @@ QVariantMap recordToMap(const MusicSourceRecord &record)
     return map;
 }
 
+QVariantMap onlineTrackToMap(const MusicSourceRegistry::OnlineTrack &track)
+{
+    QVariantMap map;
+    map.insert(QStringLiteral("source"), track.source);
+    map.insert(QStringLiteral("songId"), track.songId);
+    map.insert(QStringLiteral("title"), track.title);
+    map.insert(QStringLiteral("artist"), track.artist);
+    map.insert(QStringLiteral("album"), track.album);
+    map.insert(QStringLiteral("artworkUrl"), track.artworkUrl);
+    map.insert(QStringLiteral("requestText"),
+               QStringLiteral("%1:%2 128k").arg(track.source, track.songId));
+    return map;
+}
+
+QList<MusicSourceRegistry::OnlineTrack> defaultOnlineTracks()
+{
+    return {
+        {QStringLiteral("wy"), QStringLiteral("33894312"), QStringLiteral("失眠"), QStringLiteral("Suki刘舒妤"), QStringLiteral("Ladies Night"), {}},
+        {QStringLiteral("wy"), QStringLiteral("1973665667"), QStringLiteral("海屿你"), QStringLiteral("马也_Crabbit"), QStringLiteral("海屿你"), {}},
+        {QStringLiteral("wy"), QStringLiteral("3399839173"), QStringLiteral("甲乙丙丁"), QStringLiteral("李佳薇"), QStringLiteral("甲乙丙丁"), {}},
+        {QStringLiteral("wy"), QStringLiteral("1303464858"), QStringLiteral("于是"), QStringLiteral("郑润泽"), QStringLiteral("于是"), {}},
+        {QStringLiteral("wy"), QStringLiteral("3382908505"), QStringLiteral("玻璃"), QStringLiteral("Gareth.T"), QStringLiteral("玻璃"), {}},
+        {QStringLiteral("wy"), QStringLiteral("3404238777"), QStringLiteral("周旋"), QStringLiteral("王以太 / 艾热 AIR"), QStringLiteral("太热爱"), {}},
+        {QStringLiteral("wy"), QStringLiteral("1827600686"), QStringLiteral("还是会想你"), QStringLiteral("林达浪 / h3R3"), QStringLiteral("还是会想你"), {}},
+        {QStringLiteral("wy"), QStringLiteral("488249475"), QStringLiteral("哪里都是你"), QStringLiteral("队长"), QStringLiteral("哪里都是你"), {}},
+        {QStringLiteral("wy"), QStringLiteral("27747329"), QStringLiteral("坠落"), QStringLiteral("蔡健雅"), QStringLiteral("天使与魔鬼的对话"), {}},
+        {QStringLiteral("wy"), QStringLiteral("31654343"), QStringLiteral("不将就"), QStringLiteral("李荣浩"), QStringLiteral("有理想"), {}},
+    };
+}
+
 MusicSourceRecord mapToRecord(const QVariantMap &map)
 {
     MusicSourceRecord record;
@@ -171,11 +201,23 @@ QString jsonErrorText(const QJsonObject &object)
     const QString alternateMessage = object.value(QStringLiteral("message")).toString();
     return alternateMessage.isEmpty() ? QStringLiteral("unknown error") : alternateMessage;
 }
+
+QString artistsText(const QJsonArray &artists)
+{
+    QStringList names;
+    for (const QJsonValue &artistValue : artists) {
+        const QString name = artistValue.toObject().value(QStringLiteral("name")).toString().simplified();
+        if (!name.isEmpty())
+            names.append(name);
+    }
+    return names.join(QStringLiteral(" / "));
+}
 }
 
 MusicSourceRegistry::MusicSourceRegistry(QObject *parent)
     : QObject(parent)
 {
+    m_onlineTracks = defaultOnlineTracks();
     loadSources();
 }
 
@@ -202,9 +244,28 @@ int MusicSourceRegistry::sourceCount() const
     return m_sources.size();
 }
 
+QVariantList MusicSourceRegistry::onlineTracks() const
+{
+    QVariantList values;
+    values.reserve(m_onlineTracks.size());
+    for (const OnlineTrack &track : m_onlineTracks)
+        values.append(onlineTrackToMap(track));
+    return values;
+}
+
+int MusicSourceRegistry::onlineTrackCount() const
+{
+    return m_onlineTracks.size();
+}
+
 bool MusicSourceRegistry::busy() const
 {
     return m_busy;
+}
+
+bool MusicSourceRegistry::catalogBusy() const
+{
+    return m_catalogBusy;
 }
 
 bool MusicSourceRegistry::resolving() const
@@ -274,15 +335,86 @@ void MusicSourceRegistry::importFromText(const QString &sourceText)
         setErrorString(tr("No LX custom source script was found."));
 }
 
+void MusicSourceRegistry::loadOnlineTracks()
+{
+    if (m_catalogBusy)
+        return;
+
+    setCatalogBusy(true);
+    setErrorString({});
+    setStatusText(tr("Loading online source tracks."));
+
+    QNetworkRequest request(QUrl(QStringLiteral("https://music.163.com/api/playlist/detail?id=3778678")));
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setRawHeader("User-Agent", "Mozilla/5.0 Aurora/0.5.3");
+    QNetworkReply *reply = m_network.get(request);
+    QTimer::singleShot(12000, reply, [reply]() {
+        if (reply->isRunning())
+            reply->abort();
+    });
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            setCatalogBusy(false);
+            setErrorString(tr("Unable to load online source tracks: %1").arg(reply->errorString()));
+            reply->deleteLater();
+            return;
+        }
+
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(reply->readAll(), &parseError);
+        reply->deleteLater();
+
+        if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+            setCatalogBusy(false);
+            setErrorString(tr("Online source tracks returned invalid JSON."));
+            return;
+        }
+
+        const QJsonArray tracks = document.object()
+                                      .value(QStringLiteral("result"))
+                                      .toObject()
+                                      .value(QStringLiteral("tracks"))
+                                      .toArray();
+        QList<OnlineTrack> loadedTracks;
+        loadedTracks.reserve(qMin(tracks.size(), 60));
+        for (const QJsonValue &trackValue : tracks) {
+            const QJsonObject trackObject = trackValue.toObject();
+            const QString songId = QString::number(static_cast<qint64>(
+                trackObject.value(QStringLiteral("id")).toDouble()));
+            const QString title = trackObject.value(QStringLiteral("name")).toString().simplified();
+            if (songId == QStringLiteral("0") || title.isEmpty())
+                continue;
+
+            const QJsonObject albumObject = trackObject.value(QStringLiteral("album")).toObject();
+            loadedTracks.append(OnlineTrack {
+                QStringLiteral("wy"),
+                songId,
+                title,
+                artistsText(trackObject.value(QStringLiteral("artists")).toArray()),
+                albumObject.value(QStringLiteral("name")).toString().simplified(),
+                albumObject.value(QStringLiteral("picUrl")).toString().trimmed(),
+            });
+
+            if (loadedTracks.size() >= 60)
+                break;
+        }
+
+        if (!loadedTracks.isEmpty()) {
+            m_onlineTracks = loadedTracks;
+            emit onlineTracksChanged();
+            setStatusText(tr("Loaded %n online source track(s).", nullptr, m_onlineTracks.size()));
+        }
+
+        setCatalogBusy(false);
+    });
+}
+
 void MusicSourceRegistry::resolveFromText(const QString &requestText)
 {
     if (m_resolving)
         return;
-
-    if (m_sources.isEmpty()) {
-        setErrorString(tr("Import an LX music source before resolving playback."));
-        return;
-    }
 
     const std::optional<ResolveRequest> request = parseResolveRequest(requestText);
     if (!request.has_value()) {
@@ -290,18 +422,60 @@ void MusicSourceRegistry::resolveFromText(const QString &requestText)
         return;
     }
 
-    m_resolveRequest = request.value();
-    m_scriptEngine.reset();
-    ++m_resolveGeneration;
-    setErrorString({});
-    setStatusText(tr("Resolving %1:%2").arg(m_resolveRequest.source, m_resolveRequest.songId));
-    setResolving(true);
-    resolveWithSourceAt(0);
+    m_resolvingPlaylist = false;
+    m_playlistRequests.clear();
+    m_playlistResolvedUrls.clear();
+    startResolveRequest(request.value());
 }
 
 void MusicSourceRegistry::resolveDemoTrack()
 {
     resolveFromText(QStringLiteral("wy:33894312 128k"));
+}
+
+void MusicSourceRegistry::resolveOnlineTrackAt(int index)
+{
+    if (m_resolving)
+        return;
+
+    const std::optional<ResolveRequest> request = resolveRequestForOnlineTrack(index);
+    if (!request.has_value()) {
+        setErrorString(tr("Select an online source track."));
+        return;
+    }
+
+    m_resolvingPlaylist = false;
+    m_playlistRequests.clear();
+    m_playlistResolvedUrls.clear();
+    startResolveRequest(request.value());
+}
+
+void MusicSourceRegistry::resolveOnlineTracksFrom(int index)
+{
+    if (m_resolving)
+        return;
+
+    if (index < 0 || index >= m_onlineTracks.size())
+        index = 0;
+
+    m_playlistRequests.clear();
+    m_playlistResolvedUrls.clear();
+    for (int i = index; i < m_onlineTracks.size(); ++i) {
+        const std::optional<ResolveRequest> request = resolveRequestForOnlineTrack(i);
+        if (request.has_value())
+            m_playlistRequests.append(request.value());
+
+        if (m_playlistRequests.size() >= 24)
+            break;
+    }
+
+    if (m_playlistRequests.isEmpty()) {
+        setErrorString(tr("No online source tracks are ready."));
+        return;
+    }
+
+    m_resolvingPlaylist = true;
+    continuePlaylistResolve();
 }
 
 void MusicSourceRegistry::clearSources()
@@ -452,6 +626,52 @@ std::optional<MusicSourceRegistry::ResolveRequest> MusicSourceRegistry::parseRes
         ? QStringLiteral("128k")
         : match.captured(3);
     return request;
+}
+
+std::optional<MusicSourceRegistry::ResolveRequest> MusicSourceRegistry::resolveRequestForOnlineTrack(
+    int index) const
+{
+    if (index < 0 || index >= m_onlineTracks.size())
+        return std::nullopt;
+
+    const OnlineTrack &track = m_onlineTracks.at(index);
+    if (track.source.isEmpty() || track.songId.isEmpty())
+        return std::nullopt;
+
+    return ResolveRequest {
+        track.source,
+        track.songId,
+        QStringLiteral("128k"),
+    };
+}
+
+void MusicSourceRegistry::startResolveRequest(const ResolveRequest &request)
+{
+    m_resolveRequest = request;
+    m_scriptEngine.reset();
+    ++m_resolveGeneration;
+    setErrorString({});
+    setStatusText(tr("Resolving %1:%2").arg(m_resolveRequest.source, m_resolveRequest.songId));
+    setResolving(true);
+    resolveWithSourceAt(0);
+}
+
+void MusicSourceRegistry::continuePlaylistResolve()
+{
+    if (!m_resolvingPlaylist)
+        return;
+
+    if (m_playlistRequests.isEmpty()) {
+        m_resolvingPlaylist = false;
+        setResolving(false);
+        setErrorString({});
+        setStatusText(tr("Resolved %n online source track(s).", nullptr, m_playlistResolvedUrls.size()));
+        emit musicUrlsResolved(m_playlistResolvedUrls);
+        return;
+    }
+
+    const ResolveRequest request = m_playlistRequests.takeFirst();
+    startResolveRequest(request);
 }
 
 void MusicSourceRegistry::resolveWithSourceAt(int index)
@@ -796,6 +1016,24 @@ void MusicSourceRegistry::failCurrentResolver(const QString &message)
     ++m_resolveGeneration;
     if (QJSEngine *engine = m_scriptEngine.release())
         engine->deleteLater();
+
+    if (m_resolvingPlaylist && !m_playlistRequests.isEmpty()) {
+        setErrorString(message);
+        setStatusText(tr("Skipping unavailable online track."));
+        QTimer::singleShot(0, this, &MusicSourceRegistry::continuePlaylistResolve);
+        return;
+    }
+
+    if (m_resolvingPlaylist && !m_playlistResolvedUrls.isEmpty()) {
+        m_resolvingPlaylist = false;
+        setResolving(false);
+        setErrorString({});
+        setStatusText(tr("Resolved %n online source track(s).", nullptr, m_playlistResolvedUrls.size()));
+        emit musicUrlsResolved(m_playlistResolvedUrls);
+        return;
+    }
+
+    m_resolvingPlaylist = false;
     setResolving(false);
     setErrorString(message);
 }
@@ -805,6 +1043,22 @@ void MusicSourceRegistry::finishCurrentResolver(const QString &musicUrl)
     ++m_resolveGeneration;
     if (QJSEngine *engine = m_scriptEngine.release())
         engine->deleteLater();
+
+    if (m_resolvingPlaylist) {
+        m_playlistResolvedUrls.append(musicUrl);
+        if (!m_playlistRequests.isEmpty()) {
+            QTimer::singleShot(0, this, &MusicSourceRegistry::continuePlaylistResolve);
+            return;
+        }
+
+        m_resolvingPlaylist = false;
+        setResolving(false);
+        setErrorString({});
+        setStatusText(tr("Resolved %n online source track(s).", nullptr, m_playlistResolvedUrls.size()));
+        emit musicUrlsResolved(m_playlistResolvedUrls);
+        return;
+    }
+
     setResolving(false);
     setErrorString({});
     setStatusText(tr("Resolved playback URL."));
@@ -861,6 +1115,15 @@ void MusicSourceRegistry::setBusy(bool busy)
 
     m_busy = busy;
     emit busyChanged();
+}
+
+void MusicSourceRegistry::setCatalogBusy(bool busy)
+{
+    if (m_catalogBusy == busy)
+        return;
+
+    m_catalogBusy = busy;
+    emit catalogBusyChanged();
 }
 
 void MusicSourceRegistry::setResolving(bool resolving)
