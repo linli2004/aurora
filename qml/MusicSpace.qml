@@ -25,6 +25,7 @@ Item {
     readonly property real progressRatio:
         AudioRuntime.duration > 0 ? Math.min(1, AudioRuntime.position / AudioRuntime.duration) : 0
     readonly property bool libraryBrowserAvailable: LocalLibrary.sourceCount > 0 || LocalLibrary.searchText.length > 0
+    readonly property string firstRunLibraryMessage: LocalLibrary.defaultMusicDirectoryAvailable ? "First run · scan Music folder" : "First run · choose a music folder"
 
     signal closeRequested()
 
@@ -292,9 +293,8 @@ Item {
         anchors.leftMargin: 28
         anchors.topMargin: 82
         width: 246
-        height: libraryMenuExpanded ? 150 : 42
-
-        Rectangle {
+        height: libraryMenuExpanded ? (LocalLibrary.firstRun ? 184 : 150) : 42
+    Rectangle {
             id: libraryMenuButton
             width: 150
             height: 42
@@ -331,8 +331,8 @@ Item {
             anchors.top: libraryMenuButton.bottom
             anchors.topMargin: 8
             width: parent.width
-            height: 100
-            visible: root.libraryMenuExpanded
+            height: LocalLibrary.firstRun ? 134 : 100
+        visible: root.libraryMenuExpanded
             opacity: root.libraryMenuExpanded ? 1 : 0
             radius: 8
             color: Qt.rgba(0.04, 0.05, 0.07, 0.74)
@@ -346,13 +346,8 @@ Item {
 
                 Text {
                     width: parent.width
-                    text: LocalLibrary.lastScanStatus.length > 0
-                          ? LocalLibrary.lastScanStatus
-                            + (LocalLibrary.scanning
-                               ? " · " + LocalLibrary.scannedFileCount + " files"
-                               : "")
-                          : "No folder scanned"
-                    color: LocalLibrary.errorString.length > 0
+                    text: LocalLibrary.lastScanStatus.length > 0 ? LocalLibrary.lastScanStatus + (LocalLibrary.scanning ? " · " + LocalLibrary.scannedFileCount + " files" : "") : (LocalLibrary.firstRun ? root.firstRunLibraryMessage : LocalLibrary.trackCount + " tracks ready")
+                color: LocalLibrary.errorString.length > 0
                            ? AuroraTokens.warmAccent
                            : AuroraTokens.textMuted
                     font.pixelSize: 11
@@ -374,19 +369,12 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: LocalLibrary.scanning ? "Cancel scan" : "Scan folder"
-                            color: AuroraTokens.textSecondary
+                            text: LocalLibrary.scanning ? "Cancel scan" : (LocalLibrary.firstRun && LocalLibrary.defaultMusicDirectoryAvailable ? "Scan Music" : "Scan folder")
+                    color: AuroraTokens.textSecondary
                             font.pixelSize: 11
                         }
 
-                        TapHandler {
-                            onTapped: {
-                                if (LocalLibrary.scanning)
-                                    LocalLibrary.cancelScan()
-                                else
-                                    libraryDialog.open()
-                            }
-                        }
+                        TapHandler { onTapped: { if (LocalLibrary.scanning) LocalLibrary.cancelScan(); else if (LocalLibrary.firstRun && LocalLibrary.defaultMusicDirectoryAvailable) LocalLibrary.scanDefaultMusicDirectory(); else libraryDialog.open() } }
                     }
 
                     Rectangle {
@@ -403,15 +391,12 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: "Play library"
-                            color: AuroraTokens.textSecondary
+                            text: LocalLibrary.sourceCount > 0 ? "Play library" : "Choose folder"
+                    color: AuroraTokens.textSecondary
                             font.pixelSize: 11
                         }
 
-                        TapHandler {
-                            enabled: LocalLibrary.sourceCount > 0
-                            onTapped: AudioRuntime.setQueue(LocalLibrary.playableUrls())
-                        }
+                        TapHandler { enabled: LocalLibrary.sourceCount > 0 || !LocalLibrary.scanning; onTapped: { if (LocalLibrary.sourceCount > 0) AudioRuntime.setQueue(LocalLibrary.playableUrls()); else libraryDialog.open() } }
                     }
                 }
             }
@@ -627,8 +612,8 @@ Item {
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
                         visible: libraryList.count === 0
-                        text: LocalLibrary.searchText.length > 0 ? "No matching tracks" : "No tracks"
-                        color: AuroraTokens.textMuted
+                        text: LocalLibrary.searchText.length > 0 ? "No matching tracks" : (LocalLibrary.firstRun ? "Scan your Music folder to begin" : "No tracks")
+                            color: AuroraTokens.textMuted
                         font.pixelSize: 12
                         wrapMode: Text.Wrap
                     }

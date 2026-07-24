@@ -45,7 +45,7 @@ REQUIRED = [
     "tests/test_local_track_identity.cpp",
     "tests/test_local_library_repository.cpp",
     "docs/engineering/MVP_v0.1.md",
-    "docs/engineering/ARCHITECTURE.md",
+    "docs/engineering/ARCHITECTURE.md", "docs/reviews/AUR-024_INSTALLED_RUNTIME_FIRST_RUN_REVIEW.md", "docs/tasks/AUR-024_INSTALLED_RUNTIME_FIRST_RUN.md",
 ]
 
 missing = [path for path in REQUIRED if not (ROOT / path).is_file()]

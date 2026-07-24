@@ -21,7 +21,7 @@ QString defaultDatabasePath()
     return QDir(dataLocation).filePath(QStringLiteral("library.sqlite"));
 }
 
-bool supportedAudioFile(const QFileInfo &fileInfo)
+struct DefaultMusicDirectory { QUrl url; QString label; bool available = false; }; DefaultMusicDirectory resolveDefaultMusicDirectory() { QString musicPath = QStandardPaths::writableLocation(QStandardPaths::MusicLocation); if (musicPath.isEmpty()) musicPath = QDir::home().filePath(QStringLiteral("Music")); const QFileInfo info(musicPath); const bool available = info.exists() && info.isDir() && info.isReadable(); return { QUrl::fromLocalFile(info.absoluteFilePath()), QDir::toNativeSeparators(info.absoluteFilePath()), available }; } bool supportedAudioFile(const QFileInfo &fileInfo)
 {
     static const QStringList extensions {
         QStringLiteral("mp3"),
@@ -39,7 +39,7 @@ bool supportedAudioFile(const QFileInfo &fileInfo)
 LocalLibraryService::LocalLibraryService(QObject *parent)
     : QObject(parent)
     , m_databasePath(defaultDatabasePath())
-{
+{ const DefaultMusicDirectory defaultMusic = resolveDefaultMusicDirectory(); m_defaultMusicDirectory = defaultMusic.url; m_defaultMusicDirectoryLabel = defaultMusic.label; m_defaultMusicDirectoryAvailable = defaultMusic.available;
     refreshCounts();
     refreshTracks();
 }
@@ -72,7 +72,7 @@ QString LocalLibraryService::lastScanStatus() const
 QString LocalLibraryService::errorString() const
 {
     return m_errorString;
-}
+} bool LocalLibraryService::firstRun() const { return !m_scanning && m_sourceCount == 0 && m_trackCount == 0; } QUrl LocalLibraryService::defaultMusicDirectory() const { return m_defaultMusicDirectory; } QString LocalLibraryService::defaultMusicDirectoryLabel() const { return m_defaultMusicDirectoryLabel; } bool LocalLibraryService::defaultMusicDirectoryAvailable() const { return m_defaultMusicDirectoryAvailable; }
 
 int LocalLibraryService::scannedFileCount() const
 {
@@ -94,7 +94,7 @@ QAbstractListModel *LocalLibraryService::tracks()
     return &m_trackModel;
 }
 
-void LocalLibraryService::scanDirectory(const QUrl &directory)
+void LocalLibraryService::scanDefaultMusicDirectory() { if (!m_defaultMusicDirectoryAvailable) { setErrorString(tr("The default Music folder is not readable. Choose another folder.")); return; } scanDirectory(m_defaultMusicDirectory); } void LocalLibraryService::scanDirectory(const QUrl &directory)
 {
     if (m_scanning)
         return;
