@@ -9,6 +9,8 @@
 #include <QVariantMap>
 #include <QtGlobal>
 
+#include <utility>
+
 #include "runtime/AuroraTypes.h"
 #include "runtime/library/LocalLibraryRepository.h"
 
@@ -384,49 +386,8 @@ void AudioRuntime::setQueue(const QVariantList &urls)
 
 void AudioRuntime::setQueueWithMetadata(const QVariantList &tracks)
 {
-    QList<QUrl> urls;
-    urls.reserve(tracks.size());
     QHash<QString, LocalTrackIdentity> identityOverrides;
-    QSet<QString> seen;
-
-    for (const QVariant &trackValue : tracks) {
-        const QVariantMap track = trackValue.toMap();
-        const QUrl url = QUrl::fromUserInput(track.value(QStringLiteral("url")).toString());
-        if (!url.isValid() || url.isEmpty())
-            continue;
-
-        const QList<QUrl> filtered = validAudioSources({url});
-        if (filtered.isEmpty())
-            continue;
-
-        const QUrl playableUrl = filtered.first();
-        const QString key = queueMetadataKey(playableUrl);
-        if (seen.contains(key))
-            continue;
-
-        seen.insert(key);
-        urls.append(playableUrl);
-
-        LocalTrackIdentity identity = LocalTrackIdentityResolver::fallbackFor(playableUrl);
-        const QString title = track.value(QStringLiteral("title")).toString().simplified();
-        const QString artist = track.value(QStringLiteral("artist")).toString().simplified();
-        const QString album = track.value(QStringLiteral("album")).toString().simplified();
-        const QUrl artworkUrl = QUrl::fromUserInput(track.value(QStringLiteral("artworkUrl")).toString());
-
-        if (!title.isEmpty())
-            identity.title = title;
-        if (!artist.isEmpty())
-            identity.artist = artist;
-        if (!album.isEmpty())
-            identity.album = album;
-        if (artworkUrl.isValid() && !artworkUrl.isEmpty())
-            identity.artworkSource = artworkUrl;
-
-        identity.canonicalTitle = identity.title.toCaseFolded();
-        identity.metadataAvailable = true;
-        identity.provenance = QStringLiteral("Online source catalog · Resolver metadata");
-        identityOverrides.insert(key, identity);
-    }
+    const QList<QUrl> urls = urlsFromMetadataTracks(tracks, &identityOverrides);
 
     if (urls.isEmpty()) {
         setErrorString(tr("No playable online source tracks were resolved."));
@@ -437,6 +398,40 @@ void AudioRuntime::setQueueWithMetadata(const QVariantList &tracks)
     m_queue.setUrls(urls);
     emit queueChanged();
     loadCurrent(true);
+    persistSession();
+}
+
+void AudioRuntime::appendQueueWithMetadata(const QVariantList &tracks)
+{
+    QHash<QString, LocalTrackIdentity> identityOverrides;
+    QList<QUrl> urls = urlsFromMetadataTracks(tracks, &identityOverrides);
+    if (urls.isEmpty())
+        return;
+
+    QSet<QString> existing;
+    for (const QUrl &url : m_queue.urls())
+        existing.insert(queueMetadataKey(url));
+
+    qsizetype writeIndex = 0;
+    for (const QUrl &url : std::as_const(urls)) {
+        if (existing.contains(queueMetadataKey(url)))
+            continue;
+
+        existing.insert(queueMetadataKey(url));
+        urls[writeIndex++] = url;
+        m_queueIdentityOverrides.insert(queueMetadataKey(url),
+                                        identityOverrides.value(queueMetadataKey(url)));
+    }
+    urls.resize(writeIndex);
+    if (urls.isEmpty())
+        return;
+
+    const bool wasEmpty = m_queue.isEmpty();
+    m_queue.appendUrls(urls);
+    emit queueChanged();
+
+    if (wasEmpty)
+        loadCurrent(true);
     persistSession();
 }
 
@@ -658,6 +653,57 @@ QList<QUrl> AudioRuntime::urlsFromSourceText(const QString &sourceText) const
         const QUrl url = QUrl::fromUserInput(entry);
         if (url.isValid() && !url.isEmpty())
             urls.append(url);
+    }
+
+    return urls;
+}
+
+QList<QUrl> AudioRuntime::urlsFromMetadataTracks(
+    const QVariantList &tracks,
+    QHash<QString, LocalTrackIdentity> *identityOverrides) const
+{
+    QList<QUrl> urls;
+    urls.reserve(tracks.size());
+    QSet<QString> seen;
+
+    for (const QVariant &trackValue : tracks) {
+        const QVariantMap track = trackValue.toMap();
+        const QUrl url = QUrl::fromUserInput(track.value(QStringLiteral("url")).toString());
+        if (!url.isValid() || url.isEmpty())
+            continue;
+
+        const QList<QUrl> filtered = validAudioSources({url});
+        if (filtered.isEmpty())
+            continue;
+
+        const QUrl playableUrl = filtered.first();
+        const QString key = queueMetadataKey(playableUrl);
+        if (seen.contains(key))
+            continue;
+
+        seen.insert(key);
+        urls.append(playableUrl);
+
+        LocalTrackIdentity identity = LocalTrackIdentityResolver::fallbackFor(playableUrl);
+        const QString title = track.value(QStringLiteral("title")).toString().simplified();
+        const QString artist = track.value(QStringLiteral("artist")).toString().simplified();
+        const QString album = track.value(QStringLiteral("album")).toString().simplified();
+        const QUrl artworkUrl = QUrl::fromUserInput(track.value(QStringLiteral("artworkUrl")).toString());
+
+        if (!title.isEmpty())
+            identity.title = title;
+        if (!artist.isEmpty())
+            identity.artist = artist;
+        if (!album.isEmpty())
+            identity.album = album;
+        if (artworkUrl.isValid() && !artworkUrl.isEmpty())
+            identity.artworkSource = artworkUrl;
+
+        identity.canonicalTitle = identity.title.toCaseFolded();
+        identity.metadataAvailable = true;
+        identity.provenance = QStringLiteral("Online source catalog · Resolver metadata");
+        if (identityOverrides)
+            identityOverrides->insert(key, identity);
     }
 
     return urls;

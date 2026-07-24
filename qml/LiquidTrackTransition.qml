@@ -134,6 +134,7 @@ Item {
             accessibilityMode: root.accessibilityMode
             qualityMode: root.qualityMode
             heroMode: true
+            mangaMode: true
         }
     }
 
@@ -157,6 +158,7 @@ Item {
             accessibilityMode: root.accessibilityMode
             qualityMode: root.qualityMode
             heroMode: true
+            mangaMode: true
         }
     }
 

@@ -92,6 +92,7 @@ public:
 
     Q_INVOKABLE void setQueue(const QVariantList &urls);
     Q_INVOKABLE void setQueueWithMetadata(const QVariantList &tracks);
+    Q_INVOKABLE void appendQueueWithMetadata(const QVariantList &tracks);
     Q_INVOKABLE void appendFiles(const QVariantList &urls);
     Q_INVOKABLE void setQueueFromText(const QString &sourceText);
     Q_INVOKABLE void appendSourcesFromText(const QString &sourceText);
@@ -125,6 +126,9 @@ signals:
 private:
     QList<QUrl> validAudioSources(const QList<QUrl> &urls) const;
     QList<QUrl> urlsFromSourceText(const QString &sourceText) const;
+    QList<QUrl> urlsFromMetadataTracks(
+        const QVariantList &tracks,
+        QHash<QString, LocalTrackIdentity> *identityOverrides) const;
     void loadCurrent(bool autoplay, qint64 initialPosition = -1);
     [[nodiscard]] LocalTrackIdentity identityOverrideFor(const QUrl &url) const;
     void applyPendingSessionPosition();

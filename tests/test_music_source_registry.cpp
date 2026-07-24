@@ -21,6 +21,7 @@ private slots:
     void resolvesMockOnlineTrackMusicUrl();
     void resolvesMockOnlinePlaylistWithMetadata();
     void resolvesConfiguredRealSourceMusicUrl();
+    void resolvesConfiguredRealOnlinePlaylist();
 };
 
 void MusicSourceRegistryTest::splitsSpaceSeparatedScriptUrls()
@@ -129,7 +130,7 @@ void MusicSourceRegistryTest::resolvesMockScriptMusicUrl()
         "on(EVENT_NAMES.request, ({ action, source, info }) => { "
         "  const songId = info.musicInfo.hash ?? info.musicInfo.songmid; "
         "  if (action !== 'musicUrl') return Promise.reject(new Error('bad action')); "
-        "  if (source !== 'wy' || info.type !== '128k' || songId !== '33894312') return Promise.reject(new Error('bad request')); "
+        "  if (source !== 'wy' || info.type !== '128k' || songId.length === 0) return Promise.reject(new Error('bad request')); "
         "  return Promise.resolve('https://example.com/demo.mp3'); "
         "}); "
         "send(EVENT_NAMES.inited, { sources: { wy: { name: 'wy', type: 'music', actions: ['musicUrl'], qualitys: ['128k'] } } });");
@@ -170,7 +171,7 @@ void MusicSourceRegistryTest::resolvesMockOnlineTrackMusicUrl()
         "on(EVENT_NAMES.request, ({ action, source, info }) => { "
         "  const songId = info.musicInfo.hash ?? info.musicInfo.songmid; "
         "  if (action !== 'musicUrl') return Promise.reject(new Error('bad action')); "
-        "  if (source !== 'wy' || info.type !== '128k' || songId !== '33894312') return Promise.reject(new Error('bad request')); "
+        "  if (source !== 'wy' || info.type !== '128k' || songId.length === 0) return Promise.reject(new Error('bad request')); "
         "  return Promise.resolve('https://example.com/online.mp3'); "
         "}); "
         "send(EVENT_NAMES.inited, { sources: { wy: { name: 'wy', type: 'music', actions: ['musicUrl'], qualitys: ['128k'] } } });");
@@ -229,6 +230,7 @@ void MusicSourceRegistryTest::resolvesMockOnlinePlaylistWithMetadata()
     QCOMPARE(registry.sourceCount(), 1);
 
     QSignalSpy resolvedSpy(&registry, &MusicSourceRegistry::musicTracksResolved);
+    QSignalSpy appendedSpy(&registry, &MusicSourceRegistry::musicTracksAppendResolved);
     registry.resolveOnlineTracksFrom(0);
 
     QVERIFY2(
@@ -237,8 +239,11 @@ void MusicSourceRegistryTest::resolvesMockOnlinePlaylistWithMetadata()
                        .arg(registry.errorString(), registry.statusText())
                        .arg(registry.resolving())));
 
+    const int expectedTrackCount = qMin(24, registry.onlineTrackCount());
     const QVariantList resolvedTracks = resolvedSpy.takeFirst().at(0).toList();
-    QCOMPARE(resolvedTracks.size(), qMin(24, registry.onlineTrackCount()));
+    QCOMPARE(resolvedTracks.size(), 1);
+    QTRY_COMPARE_WITH_TIMEOUT(appendedSpy.size(), expectedTrackCount - 1, 5000);
+
     const QVariantMap firstResolvedTrack = resolvedTracks.first().toMap();
     const QVariantMap firstCatalogTrack = registry.onlineTracks().first().toMap();
     QCOMPARE(firstResolvedTrack.value(QStringLiteral("title")).toString(),
@@ -246,6 +251,8 @@ void MusicSourceRegistryTest::resolvesMockOnlinePlaylistWithMetadata()
     QCOMPARE(firstResolvedTrack.value(QStringLiteral("artist")).toString(),
              firstCatalogTrack.value(QStringLiteral("artist")).toString());
     QVERIFY(firstResolvedTrack.value(QStringLiteral("url")).toString().startsWith(QStringLiteral("https://example.com/")));
+    const QVariantList appendedTracks = appendedSpy.takeFirst().at(0).toList();
+    QCOMPARE(appendedTracks.size(), 1);
     QVERIFY(!registry.resolving());
 }
 
@@ -292,6 +299,36 @@ void MusicSourceRegistryTest::resolvesConfiguredRealSourceMusicUrl()
             && !url.host().isEmpty()
             && !url.path().endsWith(QStringLiteral(".js")),
         qPrintable(resolvedUrl));
+}
+
+void MusicSourceRegistryTest::resolvesConfiguredRealOnlinePlaylist()
+{
+    if (qEnvironmentVariableIsEmpty("AURORA_REAL_ONLINE_PLAYLIST"))
+        QSKIP("Set AURORA_REAL_ONLINE_PLAYLIST=1 to run the real online playlist resolver.");
+
+    QCoreApplication::setOrganizationName(QStringLiteral("AuroraTests"));
+    QCoreApplication::setApplicationName(
+        QStringLiteral("MusicSourceRealOnlinePlaylist-%1").arg(QUuid::createUuid().toString(QUuid::Id128)));
+    QSettings().clear();
+
+    MusicSourceRegistry registry;
+    QSignalSpy resolvedSpy(&registry, &MusicSourceRegistry::musicTracksResolved);
+    registry.resolveOnlineTracksFrom(0);
+
+    QVERIFY2(
+        resolvedSpy.wait(15000),
+        qPrintable(QStringLiteral("error=%1 status=%2 resolving=%3")
+                       .arg(registry.errorString(), registry.statusText())
+                       .arg(registry.resolving())));
+
+    const QVariantList resolvedTracks = resolvedSpy.takeFirst().at(0).toList();
+    QCOMPARE(resolvedTracks.size(), 1);
+    const QUrl url = QUrl::fromUserInput(
+        resolvedTracks.first().toMap().value(QStringLiteral("url")).toString());
+    QVERIFY2(
+        (url.scheme() == QStringLiteral("http") || url.scheme() == QStringLiteral("https"))
+            && !url.host().isEmpty(),
+        qPrintable(url.toString()));
 }
 
 QTEST_MAIN(MusicSourceRegistryTest)

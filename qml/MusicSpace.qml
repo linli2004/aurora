@@ -19,6 +19,7 @@ Item {
     property bool controlMode: false
     property bool momentFeedbackVisible: false
     property bool appendResolvedSource: false
+    property bool transitionCrystalSettling: false
 
     readonly property string displayTitle:
         AudioRuntime.hasTrack ? AudioRuntime.title : AuroraI18n.text("demo.track")
@@ -189,6 +190,7 @@ Item {
         liquidTrackTransition.outgoingColor = root.displayIdentityColor
         liquidTrackTransition.targetRect = root.identityAnchorRect()
         root.transitionLanding = false
+        root.transitionCrystalSettling = true
         liquidTrackTransition.start(direction)
     }
 
@@ -292,6 +294,13 @@ Item {
         onTriggered: root.momentFeedbackVisible = false
     }
 
+    Timer {
+        id: crystalSettleTimer
+        interval: 180
+        repeat: false
+        onTriggered: root.transitionCrystalSettling = false
+    }
+
     FileDialog {
         id: audioDialog
         title: AuroraI18n.text("music.audioDialog")
@@ -338,6 +347,11 @@ Item {
             root.appendResolvedSource = false
             root.sourcePanelExpanded = false
             root.tracksPanelExpanded = false
+        }
+
+        function onMusicTracksAppendResolved(tracks) {
+            AudioRuntime.appendQueueWithMetadata(tracks)
+            root.appendResolvedSource = false
         }
     }
 
@@ -1567,11 +1581,12 @@ Item {
             heroMode: true
             mangaMode: true
             audioReactiveAvailable: AudioRuntime.audioReactiveAvailable
-            audioLevel: AudioRuntime.audioLevel
-            bassEnergy: AudioRuntime.bassEnergy
-            midEnergy: AudioRuntime.midEnergy
-            highEnergy: AudioRuntime.highEnergy
-            transientEnergy: AudioRuntime.transientEnergy
+                                    && !root.transitionCrystalSettling
+            audioLevel: root.transitionCrystalSettling ? 0.0 : AudioRuntime.audioLevel
+            bassEnergy: root.transitionCrystalSettling ? 0.0 : AudioRuntime.bassEnergy
+            midEnergy: root.transitionCrystalSettling ? 0.0 : AudioRuntime.midEnergy
+            highEnergy: root.transitionCrystalSettling ? 0.0 : AudioRuntime.highEnergy
+            transientEnergy: root.transitionCrystalSettling ? 0.0 : AudioRuntime.transientEnergy
             opacity: root.identityVisible ? 1.0 : 0.0
 
             Behavior on opacity {
@@ -1850,7 +1865,10 @@ Item {
                 AudioRuntime.previous()
         }
         onLandingStarted: root.transitionLanding = true
-        onCompleted: root.transitionLanding = false
+        onCompleted: {
+            root.transitionLanding = false
+            crystalSettleTimer.restart()
+        }
     }
 
 }

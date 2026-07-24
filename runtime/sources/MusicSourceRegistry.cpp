@@ -16,8 +16,11 @@
 #include <QUrlQuery>
 #include <QVariantMap>
 
+#include <algorithm>
+
 namespace {
 constexpr auto settingsKey = "music/sources/v1";
+constexpr int resolverNetworkTimeoutMs = 6500;
 
 QString nowUtc()
 {
@@ -89,13 +92,13 @@ QVariantMap resolvedOnlineTrackToMap(
 QList<MusicSourceRegistry::OnlineTrack> defaultOnlineTracks()
 {
     return {
-        {QStringLiteral("wy"), QStringLiteral("33894312"), QStringLiteral("失眠"), QStringLiteral("Suki刘舒妤"), QStringLiteral("Ladies Night"), {}},
         {QStringLiteral("wy"), QStringLiteral("1973665667"), QStringLiteral("海屿你"), QStringLiteral("马也_Crabbit"), QStringLiteral("海屿你"), {}},
-        {QStringLiteral("wy"), QStringLiteral("3399839173"), QStringLiteral("甲乙丙丁"), QStringLiteral("李佳薇"), QStringLiteral("甲乙丙丁"), {}},
         {QStringLiteral("wy"), QStringLiteral("1303464858"), QStringLiteral("于是"), QStringLiteral("郑润泽"), QStringLiteral("于是"), {}},
+        {QStringLiteral("wy"), QStringLiteral("1827600686"), QStringLiteral("还是会想你"), QStringLiteral("林达浪 / h3R3"), QStringLiteral("还是会想你"), {}},
+        {QStringLiteral("wy"), QStringLiteral("33894312"), QStringLiteral("失眠"), QStringLiteral("Suki刘舒妤"), QStringLiteral("Ladies Night"), {}},
+        {QStringLiteral("wy"), QStringLiteral("3399839173"), QStringLiteral("甲乙丙丁"), QStringLiteral("李佳薇"), QStringLiteral("甲乙丙丁"), {}},
         {QStringLiteral("wy"), QStringLiteral("3382908505"), QStringLiteral("玻璃"), QStringLiteral("Gareth.T"), QStringLiteral("玻璃"), {}},
         {QStringLiteral("wy"), QStringLiteral("3404238777"), QStringLiteral("周旋"), QStringLiteral("王以太 / 艾热 AIR"), QStringLiteral("太热爱"), {}},
-        {QStringLiteral("wy"), QStringLiteral("1827600686"), QStringLiteral("还是会想你"), QStringLiteral("林达浪 / h3R3"), QStringLiteral("还是会想你"), {}},
         {QStringLiteral("wy"), QStringLiteral("488249475"), QStringLiteral("哪里都是你"), QStringLiteral("队长"), QStringLiteral("哪里都是你"), {}},
         {QStringLiteral("wy"), QStringLiteral("27747329"), QStringLiteral("坠落"), QStringLiteral("蔡健雅"), QStringLiteral("天使与魔鬼的对话"), {}},
         {QStringLiteral("wy"), QStringLiteral("31654343"), QStringLiteral("不将就"), QStringLiteral("李荣浩"), QStringLiteral("有理想"), {}},
@@ -214,6 +217,31 @@ QString jsonErrorText(const QJsonObject &object)
 
     const QString alternateMessage = object.value(QStringLiteral("message")).toString();
     return alternateMessage.isEmpty() ? QStringLiteral("unknown error") : alternateMessage;
+}
+
+bool isNetEaseUnavailableMediaUrl(const QUrl &url)
+{
+    return url.path().contains(QStringLiteral("/404"));
+}
+
+bool looksLikePlayableNetEaseRedirect(const QUrl &url)
+{
+    if (!url.isValid() || url.isEmpty() || url.host().isEmpty())
+        return false;
+    if (isNetEaseUnavailableMediaUrl(url))
+        return false;
+
+    const QString path = url.path().toLower();
+    return path.endsWith(QStringLiteral(".mp3"))
+        || path.endsWith(QStringLiteral(".m4a"))
+        || path.endsWith(QStringLiteral(".flac"));
+}
+
+bool isAudioContentType(const QString &contentType)
+{
+    const QString normalized = contentType.toLower();
+    return normalized.startsWith(QStringLiteral("audio/"))
+        || normalized.contains(QStringLiteral("application/octet-stream"));
 }
 
 QString artistsText(const QJsonArray &artists)
@@ -487,7 +515,16 @@ void MusicSourceRegistry::loadOnlineTracks()
         }
 
         if (!loadedTracks.isEmpty()) {
-            m_onlineTracks = loadedTracks;
+            QList<OnlineTrack> mergedTracks = defaultOnlineTracks();
+            for (const OnlineTrack &track : loadedTracks) {
+                const auto sameTrack = [&track](const OnlineTrack &existing) {
+                    return existing.source == track.source && existing.songId == track.songId;
+                };
+                if (std::none_of(mergedTracks.cbegin(), mergedTracks.cend(), sameTrack))
+                    mergedTracks.append(track);
+            }
+
+            m_onlineTracks = mergedTracks;
             emit onlineTracksChanged();
             setStatusText(tr("Loaded %n online source track(s).", nullptr, m_onlineTracks.size()));
         }
@@ -513,12 +550,13 @@ void MusicSourceRegistry::resolveFromText(const QString &requestText)
     m_playlistTracks.clear();
     m_playlistResolvedUrls.clear();
     m_playlistResolvedTracks.clear();
+    m_playlistPlaybackStarted = false;
     startResolveRequest(request.value());
 }
 
 void MusicSourceRegistry::resolveDemoTrack()
 {
-    resolveFromText(QStringLiteral("wy:33894312 128k"));
+    resolveFromText(QStringLiteral("wy:1973665667 128k"));
 }
 
 void MusicSourceRegistry::resolveOnlineTrackAt(int index)
@@ -538,6 +576,7 @@ void MusicSourceRegistry::resolveOnlineTrackAt(int index)
     m_playlistTracks.clear();
     m_playlistResolvedUrls.clear();
     m_playlistResolvedTracks.clear();
+    m_playlistPlaybackStarted = false;
     startResolveRequest(request.value());
 }
 
@@ -553,6 +592,7 @@ void MusicSourceRegistry::resolveOnlineTracksFrom(int index)
     m_playlistTracks.clear();
     m_playlistResolvedUrls.clear();
     m_playlistResolvedTracks.clear();
+    m_playlistPlaybackStarted = false;
     for (int i = index; i < m_onlineTracks.size(); ++i) {
         const std::optional<ResolveRequest> request = resolveRequestForOnlineTrack(i);
         if (request.has_value()) {
@@ -745,6 +785,7 @@ void MusicSourceRegistry::startResolveRequest(const ResolveRequest &request)
 {
     m_resolveRequest = request;
     m_scriptEngine.reset();
+    m_triedNetEasePublicMedia = false;
     ++m_resolveGeneration;
     setErrorString({});
     setStatusText(tr("Resolving %1:%2").arg(m_resolveRequest.source, m_resolveRequest.songId));
@@ -763,9 +804,9 @@ void MusicSourceRegistry::continuePlaylistResolve()
         setResolving(false);
         setErrorString({});
         setStatusText(tr("Resolved %n online source track(s).", nullptr, m_playlistResolvedUrls.size()));
-        if (!m_playlistResolvedTracks.isEmpty())
+        if (!m_playlistPlaybackStarted && !m_playlistResolvedTracks.isEmpty())
             emit musicTracksResolved(m_playlistResolvedTracks);
-        else
+        else if (!m_playlistPlaybackStarted)
             emit musicUrlsResolved(m_playlistResolvedUrls);
         return;
     }
@@ -781,6 +822,23 @@ void MusicSourceRegistry::resolveWithSourceAt(int index)
 {
     if (!m_resolving)
         return;
+
+    bool hasLocalResolver = false;
+    for (const MusicSourceRecord &record : m_sources) {
+        if (isReadableLocalScript(sourceUrlFromRecord(record))) {
+            hasLocalResolver = true;
+            break;
+        }
+    }
+
+    if (index == 0
+        && m_resolveRequest.source == QStringLiteral("wy")
+        && !m_triedNetEasePublicMedia
+        && !hasLocalResolver) {
+        m_triedNetEasePublicMedia = true;
+        resolveNetEasePublicMediaSource({}, true);
+        return;
+    }
 
     if (index >= m_sources.size()) {
         resolveBuiltInFallbackSource(
@@ -968,7 +1026,7 @@ void MusicSourceRegistry::evaluateScriptForResolve(
         return;
     }
 
-    QTimer::singleShot(12000, this, [this, generation, index]() {
+    QTimer::singleShot(resolverNetworkTimeoutMs, this, [this, generation, index]() {
         if (m_resolving && generation == m_resolveGeneration)
             resolveWithSourceAt(index + 1);
     });
@@ -1016,7 +1074,7 @@ bool MusicSourceRegistry::resolveKnownDirectSource(
 
     const int generation = m_resolveGeneration;
     QNetworkReply *reply = m_network.get(request);
-    QTimer::singleShot(12000, reply, [reply]() {
+    QTimer::singleShot(resolverNetworkTimeoutMs, reply, [reply]() {
         if (reply->isRunning())
             reply->abort();
     });
@@ -1064,6 +1122,11 @@ void MusicSourceRegistry::resolveBuiltInFallbackSource(const QString &previousEr
     if (!m_resolving)
         return;
 
+    if (m_resolveRequest.source == QStringLiteral("wy") && m_triedNetEasePublicMedia) {
+        failCurrentResolver(previousError);
+        return;
+    }
+
     setStatusText(tr("Resolving with built-in fallback %1:%2")
                       .arg(m_resolveRequest.source, m_resolveRequest.songId));
 
@@ -1081,7 +1144,7 @@ void MusicSourceRegistry::resolveBuiltInFallbackSource(const QString &previousEr
 
     const int generation = m_resolveGeneration;
     QNetworkReply *reply = m_network.get(request);
-    QTimer::singleShot(12000, reply, [reply]() {
+    QTimer::singleShot(resolverNetworkTimeoutMs, reply, [reply]() {
         if (reply->isRunning())
             reply->abort();
     });
@@ -1096,9 +1159,15 @@ void MusicSourceRegistry::resolveBuiltInFallbackSource(const QString &previousEr
             const QString fallbackError = tr("Built-in fallback request failed: %1")
                                               .arg(reply->errorString());
             reply->deleteLater();
-            failCurrentResolver(previousError.isEmpty()
-                                    ? fallbackError
-                                    : tr("%1; %2").arg(previousError, fallbackError));
+            const QString combinedError = previousError.isEmpty()
+                ? fallbackError
+                : tr("%1; %2").arg(previousError, fallbackError);
+            if (m_resolveRequest.source == QStringLiteral("wy") && !m_triedNetEasePublicMedia) {
+                m_triedNetEasePublicMedia = true;
+                resolveNetEasePublicMediaSource(combinedError, false);
+            } else {
+                failCurrentResolver(combinedError);
+            }
             return;
         }
 
@@ -1108,9 +1177,15 @@ void MusicSourceRegistry::resolveBuiltInFallbackSource(const QString &previousEr
 
         if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
             const QString fallbackError = tr("Built-in fallback returned invalid JSON.");
-            failCurrentResolver(previousError.isEmpty()
-                                    ? fallbackError
-                                    : tr("%1; %2").arg(previousError, fallbackError));
+            const QString combinedError = previousError.isEmpty()
+                ? fallbackError
+                : tr("%1; %2").arg(previousError, fallbackError);
+            if (m_resolveRequest.source == QStringLiteral("wy") && !m_triedNetEasePublicMedia) {
+                m_triedNetEasePublicMedia = true;
+                resolveNetEasePublicMediaSource(combinedError, false);
+            } else {
+                failCurrentResolver(combinedError);
+            }
             return;
         }
 
@@ -1123,9 +1198,97 @@ void MusicSourceRegistry::resolveBuiltInFallbackSource(const QString &previousEr
 
         const QString fallbackError = tr("Built-in fallback rejected playback: %1")
                                           .arg(jsonErrorText(body));
-        failCurrentResolver(previousError.isEmpty()
-                                ? fallbackError
-                                : tr("%1; %2").arg(previousError, fallbackError));
+        const QString combinedError = previousError.isEmpty()
+            ? fallbackError
+            : tr("%1; %2").arg(previousError, fallbackError);
+        if (m_resolveRequest.source == QStringLiteral("wy") && !m_triedNetEasePublicMedia) {
+            m_triedNetEasePublicMedia = true;
+            resolveNetEasePublicMediaSource(combinedError, false);
+        } else {
+            failCurrentResolver(combinedError);
+        }
+    });
+}
+
+void MusicSourceRegistry::resolveNetEasePublicMediaSource(
+    const QString &previousError,
+    bool continueWithImportedSources)
+{
+    if (!m_resolving)
+        return;
+
+    if (m_resolveRequest.source != QStringLiteral("wy")) {
+        failCurrentResolver(previousError);
+        return;
+    }
+
+    setStatusText(tr("Resolving with NetEase public media %1:%2")
+                      .arg(m_resolveRequest.source, m_resolveRequest.songId));
+
+    QUrl requestUrl(QStringLiteral("https://music.163.com/song/media/outer/url"));
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("id"), m_resolveRequest.songId + QStringLiteral(".mp3"));
+    requestUrl.setQuery(query);
+
+    QNetworkRequest request(requestUrl);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::ManualRedirectPolicy);
+    request.setRawHeader("User-Agent", "Mozilla/5.0 Aurora/0.5.3");
+    request.setRawHeader("Referer", "https://music.163.com/");
+
+    const int generation = m_resolveGeneration;
+    QNetworkReply *reply = m_network.head(request);
+    QTimer::singleShot(resolverNetworkTimeoutMs, reply, [reply]() {
+        if (reply->isRunning())
+            reply->abort();
+    });
+
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, generation, requestUrl, previousError, continueWithImportedSources]() {
+        if (!m_resolving || generation != m_resolveGeneration) {
+            reply->deleteLater();
+            return;
+        }
+
+        const int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QUrl redirectUrl = reply->url().resolved(
+            reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl());
+        const QString contentType = reply->header(QNetworkRequest::ContentTypeHeader).toString();
+
+        if (reply->error() == QNetworkReply::NoError) {
+            if (statusCode >= 300 && statusCode < 400
+                && looksLikePlayableNetEaseRedirect(redirectUrl)) {
+                reply->deleteLater();
+                finishCurrentResolver(redirectUrl.toString());
+                return;
+            }
+
+            if (statusCode >= 200 && statusCode < 300
+                && !isNetEaseUnavailableMediaUrl(reply->url())
+                && isAudioContentType(contentType)) {
+                reply->deleteLater();
+                finishCurrentResolver(requestUrl.toString());
+                return;
+            }
+        }
+
+        const QString mediaError = reply->error() == QNetworkReply::NoError
+            ? tr("NetEase public media unavailable.")
+            : tr("NetEase public media request failed: %1").arg(reply->errorString());
+        reply->deleteLater();
+        const QString combinedError = previousError.isEmpty()
+            ? mediaError
+            : tr("%1; %2").arg(previousError, mediaError);
+        if (continueWithImportedSources) {
+            if (m_resolvingPlaylist) {
+                failCurrentResolver(combinedError);
+            } else {
+                setErrorString(combinedError);
+                resolveWithSourceAt(0);
+            }
+        } else {
+            failCurrentResolver(combinedError);
+        }
     });
 }
 
@@ -1194,9 +1357,9 @@ void MusicSourceRegistry::failCurrentResolver(const QString &message)
         setResolving(false);
         setErrorString({});
         setStatusText(tr("Resolved %n online source track(s).", nullptr, m_playlistResolvedUrls.size()));
-        if (!m_playlistResolvedTracks.isEmpty())
+        if (!m_playlistPlaybackStarted && !m_playlistResolvedTracks.isEmpty())
             emit musicTracksResolved(m_playlistResolvedTracks);
-        else
+        else if (!m_playlistPlaybackStarted)
             emit musicUrlsResolved(m_playlistResolvedUrls);
         return;
     }
@@ -1219,8 +1382,15 @@ void MusicSourceRegistry::finishCurrentResolver(const QString &musicUrl)
 
     if (m_resolvingPlaylist) {
         m_playlistResolvedUrls.append(musicUrl);
-        if (!resolvedTrack.isEmpty())
+        if (!resolvedTrack.isEmpty()) {
             m_playlistResolvedTracks.append(resolvedTrack);
+            if (!m_playlistPlaybackStarted) {
+                m_playlistPlaybackStarted = true;
+                emit musicTracksResolved(QVariantList { resolvedTrack });
+            } else {
+                emit musicTracksAppendResolved(QVariantList { resolvedTrack });
+            }
+        }
         if (!m_playlistRequests.isEmpty()) {
             QTimer::singleShot(0, this, &MusicSourceRegistry::continuePlaylistResolve);
             return;
@@ -1230,9 +1400,9 @@ void MusicSourceRegistry::finishCurrentResolver(const QString &musicUrl)
         setResolving(false);
         setErrorString({});
         setStatusText(tr("Resolved %n online source track(s).", nullptr, m_playlistResolvedUrls.size()));
-        if (!m_playlistResolvedTracks.isEmpty())
+        if (!m_playlistPlaybackStarted && !m_playlistResolvedTracks.isEmpty())
             emit musicTracksResolved(m_playlistResolvedTracks);
-        else
+        else if (!m_playlistPlaybackStarted)
             emit musicUrlsResolved(m_playlistResolvedUrls);
         return;
     }
@@ -1357,6 +1527,10 @@ void MusicSourceRegistry::scriptRequest(
         request.setRawHeader(iterator.key().toUtf8(), iterator.value().toString().toUtf8());
 
     QNetworkReply *reply = m_network.get(request);
+    QTimer::singleShot(resolverNetworkTimeoutMs, reply, [reply]() {
+        if (reply->isRunning())
+            reply->abort();
+    });
     connect(reply, &QNetworkReply::finished, this, [this, reply, callback]() mutable {
         if (!m_scriptEngine) {
             reply->deleteLater();

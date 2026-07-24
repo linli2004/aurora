@@ -100,6 +100,7 @@ signals:
     void musicUrlResolved(const QString &url);
     void musicUrlsResolved(const QStringList &urls);
     void musicTracksResolved(const QVariantList &tracks);
+    void musicTracksAppendResolved(const QVariantList &tracks);
 
 private:
     struct ResolveRequest
@@ -130,6 +131,9 @@ private:
         const QString &script,
         int index);
     void resolveBuiltInFallbackSource(const QString &previousError);
+    void resolveNetEasePublicMediaSource(
+        const QString &previousError,
+        bool continueWithImportedSources);
     void requestCurrentMusicUrl();
     void failCurrentResolver(const QString &message);
     void finishCurrentResolver(const QString &musicUrl);
@@ -156,6 +160,8 @@ private:
     bool m_catalogBusy = false;
     bool m_resolving = false;
     bool m_resolvingPlaylist = false;
+    bool m_triedNetEasePublicMedia = false;
+    bool m_playlistPlaybackStarted = false;
     QString m_statusText;
     QString m_errorString;
 };

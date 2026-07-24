@@ -43,6 +43,17 @@ void AudioRuntimeTest::setQueueWithMetadataUsesCatalogIdentity()
     QCOMPARE(runtime.artworkSource(), QUrl(QStringLiteral("https://example.com/artwork/hoshi.jpg")));
     QVERIFY(runtime.metadataAvailable());
 
+    QVariantMap appendedTrack;
+    appendedTrack.insert(QStringLiteral("url"), QStringLiteral("https://example.com/music/tsuki.mp3"));
+    appendedTrack.insert(QStringLiteral("title"), QStringLiteral("月の舟"));
+    appendedTrack.insert(QStringLiteral("artist"), QStringLiteral("Aurora Demo"));
+
+    runtime.appendQueueWithMetadata(QVariantList { appendedTrack });
+
+    QCOMPARE(runtime.queueCount(), 2);
+    QCOMPARE(runtime.currentIndex(), 0);
+    QCOMPARE(runtime.title(), QStringLiteral("星の声"));
+
     runtime.setQueueFromText(QStringLiteral("https://example.com/music/plain.mp3"));
 
     QCOMPARE(runtime.queueCount(), 1);
