@@ -6,6 +6,7 @@
 #include <QMetaObject>
 #include <QStandardPaths>
 #include <QThread>
+#include <QTimer>
 
 #include "runtime/library/LocalLibraryRepository.h"
 
@@ -85,6 +86,17 @@ LocalLibraryService::LocalLibraryService(QObject *parent)
     m_defaultMusicDirectoryLabel = defaultMusic.label;
     m_defaultMusicDirectoryAvailable = defaultMusic.available;
 
+    connect(
+        &m_libraryWatcher,
+        &LocalLibraryWatcher::refreshRequested,
+        this,
+        &LocalLibraryService::requestAutomaticRefresh);
+    connect(
+        &m_libraryWatcher,
+        &LocalLibraryWatcher::watchedDirectoriesChanged,
+        this,
+        &LocalLibraryService::watchStateChanged);
+
     int startupMissingSources = 0;
     {
         LocalLibraryRepository repository;
@@ -102,6 +114,15 @@ LocalLibraryService::LocalLibraryService(QObject *parent)
     } else if (m_unavailableRootCount > 0) {
         setLastScanStatus(
             tr("%n library folder(s) unavailable", nullptr, m_unavailableRootCount));
+    }
+
+    if (!m_libraryRoots.isEmpty()) {
+        QTimer::singleShot(
+            650,
+            this,
+            [this]() {
+                requestAutomaticRefresh();
+            });
     }
 }
 
@@ -155,6 +176,16 @@ QString LocalLibraryService::libraryRootsSummary() const
     }
 
     return summary;
+}
+
+bool LocalLibraryService::automaticRefreshActive() const
+{
+    return m_libraryWatcher.watchedDirectoryCount() > 0;
+}
+
+int LocalLibraryService::watchedDirectoryCount() const
+{
+    return m_libraryWatcher.watchedDirectoryCount();
 }
 
 QString LocalLibraryService::databasePath() const
@@ -262,7 +293,8 @@ void LocalLibraryService::rescanLibraryRoots()
 
 void LocalLibraryService::startScan(
     const QStringList &rootPaths,
-    const QString &rootToRemember)
+    const QString &rootToRemember,
+    bool automaticRefresh)
 {
     if (m_scanning)
         return;
@@ -286,6 +318,8 @@ void LocalLibraryService::startScan(
     if (!rootToRemember.isEmpty()) {
         setLastScanStatus(
             tr("Scanning %1").arg(QDir::toNativeSeparators(rootToRemember)));
+    } else if (automaticRefresh) {
+        setLastScanStatus(tr("Refreshing library changes"));
     } else {
         setLastScanStatus(
             tr("Rescanning %n library folder(s)", nullptr, normalizedRoots.size()));
@@ -299,13 +333,19 @@ void LocalLibraryService::startScan(
     const std::shared_ptr<std::atomic_bool> cancelFlag = m_cancelScan;
 
     QThread *worker = QThread::create(
-        [this, normalizedRoots, rememberedRoot, databasePath, cancelFlag]() {
+        [this,
+         normalizedRoots,
+         rememberedRoot,
+         databasePath,
+         cancelFlag,
+         automaticRefresh]() {
         LocalLibraryRepository repository;
         int scanned = 0;
         int missingSources = 0;
         int unavailableRoots = 0;
         bool cancelled = false;
         QString error;
+        QStringList watchedDirectories;
 
         if (!repository.open(databasePath)) {
             error = repository.lastError();
@@ -321,9 +361,15 @@ void LocalLibraryService::startScan(
                     continue;
                 }
 
+                watchedDirectories.append(rootPath);
+
                 QDirIterator iterator(
                     rootPath,
-                    QDir::Files | QDir::Readable | QDir::NoSymLinks,
+                    QDir::Files
+                        | QDir::Dirs
+                        | QDir::Readable
+                        | QDir::NoDotAndDotDot
+                        | QDir::NoSymLinks,
                     QDirIterator::Subdirectories);
 
                 while (iterator.hasNext()) {
@@ -332,14 +378,23 @@ void LocalLibraryService::startScan(
                         break;
                     }
 
-                    const QString filePath = iterator.next();
-                    const QFileInfo fileInfo(filePath);
+                    iterator.next();
+                    const QFileInfo fileInfo = iterator.fileInfo();
+
+                    if (fileInfo.isDir()) {
+                        const QString directoryPath =
+                            normalizedRootPath(fileInfo.absoluteFilePath());
+                        if (!directoryPath.isEmpty())
+                            watchedDirectories.append(directoryPath);
+                        continue;
+                    }
+
                     if (!supportedAudioFile(fileInfo))
                         continue;
 
                     LocalLibrarySourceRecord record;
                     record.identity = LocalTrackIdentityResolver::fallbackFor(
-                        QUrl::fromLocalFile(filePath));
+                        QUrl::fromLocalFile(fileInfo.absoluteFilePath()));
                     record.fileSize = fileInfo.size();
                     record.modifiedTime = fileInfo.lastModified();
 
@@ -380,11 +435,24 @@ void LocalLibraryService::startScan(
             }
         }
 
+        watchedDirectories.removeDuplicates();
+        watchedDirectories.sort(Qt::CaseInsensitive);
+
         QMetaObject::invokeMethod(
             this,
-            [this, scanned, cancelled, error, missingSources, unavailableRoots]() {
+            [this,
+             scanned,
+             cancelled,
+             error,
+             missingSources,
+             unavailableRoots,
+             watchedDirectories,
+             automaticRefresh]() {
                 if (!error.isEmpty())
                     setErrorString(error);
+
+                if (!cancelled && error.isEmpty())
+                    m_libraryWatcher.setWatchedDirectories(watchedDirectories);
 
                 setScannedFileCount(scanned);
                 refreshLibraryRoots();
@@ -414,6 +482,9 @@ void LocalLibraryService::startScan(
                         tr("Scanned %1 local audio files · %2 missing source(s)")
                             .arg(scanned)
                             .arg(missingSources);
+                } else if (automaticRefresh) {
+                    completionStatus =
+                        tr("Library refreshed · %1 local audio files").arg(scanned);
                 } else {
                     completionStatus =
                         tr("Scanned %1 local audio files").arg(scanned);
@@ -422,12 +493,38 @@ void LocalLibraryService::startScan(
                 setLastScanStatus(completionStatus);
                 setScanning(false);
                 m_cancelScan.reset();
+
+                const bool refreshAgain =
+                    m_automaticRefreshPending && error.isEmpty() && !cancelled;
+                m_automaticRefreshPending = false;
+
+                if (refreshAgain) {
+                    QTimer::singleShot(
+                        250,
+                        this,
+                        [this]() {
+                            requestAutomaticRefresh();
+                        });
+                }
             },
             Qt::QueuedConnection);
     });
 
     connect(worker, &QThread::finished, worker, &QObject::deleteLater);
     worker->start();
+}
+
+void LocalLibraryService::requestAutomaticRefresh()
+{
+    if (m_libraryRoots.isEmpty())
+        return;
+
+    if (m_scanning) {
+        m_automaticRefreshPending = true;
+        return;
+    }
+
+    startScan(m_libraryRoots, {}, true);
 }
 
 void LocalLibraryService::cancelScan()
@@ -521,6 +618,10 @@ void LocalLibraryService::refreshLibraryRoots()
 
     m_libraryRoots = roots;
     m_unavailableRootCount = unavailableRoots;
+
+    if (m_libraryRoots.isEmpty())
+        m_libraryWatcher.clear();
+
     emit rootsChanged();
     emit libraryChanged();
 }

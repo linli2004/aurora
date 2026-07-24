@@ -34,6 +34,8 @@ qt_add_executable(aurora
     runtime/library/LocalLibraryService.h
     runtime/library/LocalLibraryTrackModel.cpp
     runtime/library/LocalLibraryTrackModel.h
+    runtime/library/LocalLibraryWatcher.cpp
+    runtime/library/LocalLibraryWatcher.h
     runtime/platform/MprisService.cpp
     runtime/platform/MprisService.h
 )
@@ -181,6 +183,18 @@ if(BUILD_TESTING)
     )
     add_test(NAME aurora.local_library_repository COMMAND aurora_local_library_repository_tests)
 
+    qt_add_executable(aurora_local_library_watcher_tests
+        tests/test_local_library_watcher.cpp
+        runtime/library/LocalLibraryWatcher.cpp
+        runtime/library/LocalLibraryWatcher.h
+    )
+    target_include_directories(aurora_local_library_watcher_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(aurora_local_library_watcher_tests PRIVATE
+        Qt6::Core
+        Qt6::Test
+    )
+    add_test(NAME aurora.local_library_watcher COMMAND aurora_local_library_watcher_tests)
+
     qt_add_executable(aurora_audio_feature_tests
         tests/test_audio_feature_analyzer.cpp
         runtime/audio/AudioFeatureAnalyzer.cpp
@@ -213,6 +227,8 @@ if(BUILD_TESTING)
         runtime/library/LocalLibraryService.h
         runtime/library/LocalLibraryTrackModel.cpp
         runtime/library/LocalLibraryTrackModel.h
+        runtime/library/LocalLibraryWatcher.cpp
+        runtime/library/LocalLibraryWatcher.h
     )
     set_target_properties(aurora_snapshot_smoke PROPERTIES
         QT_QML_MODULE_NO_IMPORT_SCAN TRUE

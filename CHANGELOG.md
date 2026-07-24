@@ -24,6 +24,8 @@
 - Track-oriented library queries now project one preferred Available source per stable Track.
 - Persisted normalized library roots in `library.roots.v1`.
 - Added multi-folder Rescan all with unavailable-root reporting and post-scan source reconciliation.
+- Added recursive remembered-folder watching with a debounced automatic full-library refresh.
+- Added startup background refresh and watcher debounce tests.
 - Added repository tests for schema creation, TrackSource persistence and duplicate content.
 - Added repository tests for track search and settings persistence.
 - Added stable local Track ID generation from bounded file-content sampling.
