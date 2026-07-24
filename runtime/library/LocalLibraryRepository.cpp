@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 
+#include <QDir>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -28,6 +29,33 @@ QDateTime parseTime(const QString &value)
 QString nonNull(const QString &value)
 {
     return value.isNull() ? QStringLiteral("") : value;
+}
+
+QString normalizedLibraryRoot(const QString &path)
+{
+    if (path.trimmed().isEmpty())
+        return {};
+
+    const QFileInfo fileInfo(path);
+    const QString canonicalPath = fileInfo.canonicalFilePath();
+    if (!canonicalPath.isEmpty())
+        return QDir::cleanPath(canonicalPath);
+
+    return QDir::cleanPath(fileInfo.absoluteFilePath());
+}
+
+QStringList normalizedLibraryRoots(const QStringList &paths)
+{
+    QStringList roots;
+    for (const QString &path : paths) {
+        const QString normalized = normalizedLibraryRoot(path.trimmed());
+        if (normalized.isEmpty() || roots.contains(normalized))
+            continue;
+        roots.append(normalized);
+    }
+
+    roots.sort(Qt::CaseInsensitive);
+    return roots;
 }
 }
 
@@ -96,6 +124,13 @@ int LocalLibraryRepository::missingSourceCount() const
         return 0;
     }
     return query.next() ? query.value(0).toInt() : 0;
+}
+
+
+QStringList LocalLibraryRepository::libraryRoots() const
+{
+    const QVariantMap value = setting(QStringLiteral("library.roots.v1"));
+    return normalizedLibraryRoots(value.value(QStringLiteral("paths")).toStringList());
 }
 
 QStringList LocalLibraryRepository::playableFilePaths() const
@@ -407,6 +442,14 @@ bool LocalLibraryRepository::upsertSource(const LocalLibrarySourceRecord &record
     }
 
     return true;
+}
+
+
+bool LocalLibraryRepository::setLibraryRoots(const QStringList &roots)
+{
+    QVariantMap value;
+    value.insert(QStringLiteral("paths"), normalizedLibraryRoots(roots));
+    return setSetting(QStringLiteral("library.roots.v1"), value);
 }
 
 bool LocalLibraryRepository::setSetting(const QString &key, const QVariantMap &value)

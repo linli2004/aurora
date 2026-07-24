@@ -45,7 +45,13 @@ REQUIRED = [
     "tests/test_local_track_identity.cpp",
     "tests/test_local_library_repository.cpp",
     "docs/engineering/MVP_v0.1.md",
-    "docs/engineering/ARCHITECTURE.md", "docs/reviews/AUR-024_INSTALLED_RUNTIME_FIRST_RUN_REVIEW.md", "docs/tasks/AUR-024_INSTALLED_RUNTIME_FIRST_RUN.md",
+    "docs/engineering/ARCHITECTURE.md",
+    "docs/reviews/AUR-024_INSTALLED_RUNTIME_FIRST_RUN_REVIEW.md",
+    "docs/tasks/AUR-024_INSTALLED_RUNTIME_FIRST_RUN.md",
+    "docs/reviews/AUR-025_MISSING_SOURCE_RELINK_REVIEW.md",
+    "docs/tasks/AUR-025_MISSING_SOURCE_RELINK.md",
+    "docs/reviews/AUR-026_PERSISTENT_LIBRARY_ROOTS_RESCAN_REVIEW.md",
+    "docs/tasks/AUR-026_PERSISTENT_LIBRARY_ROOTS_RESCAN.md",
 ]
 
 missing = [path for path in REQUIRED if not (ROOT / path).is_file()]

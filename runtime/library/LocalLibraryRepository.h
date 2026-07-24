@@ -40,6 +40,7 @@ public:
     [[nodiscard]] int trackCount() const;
     [[nodiscard]] int sourceCount() const;
     [[nodiscard]] int missingSourceCount() const;
+    [[nodiscard]] QStringList libraryRoots() const;
     [[nodiscard]] QStringList playableFilePaths() const;
     [[nodiscard]] QList<LocalLibraryTrackRecord> tracks(const QString &searchText = {}) const;
     [[nodiscard]] QVariantMap setting(const QString &key) const;
@@ -47,6 +48,7 @@ public:
     bool initializeSchema();
     bool upsertSource(const LocalLibrarySourceRecord &record);
     bool reconcileMissingSources(int *markedMissing = nullptr);
+    bool setLibraryRoots(const QStringList &roots);
     bool setSetting(const QString &key, const QVariantMap &value);
 
 private:
