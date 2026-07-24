@@ -91,6 +91,8 @@ public:
 
     Q_INVOKABLE void setQueue(const QVariantList &urls);
     Q_INVOKABLE void appendFiles(const QVariantList &urls);
+    Q_INVOKABLE void setQueueFromText(const QString &sourceText);
+    Q_INVOKABLE void appendSourcesFromText(const QString &sourceText);
     Q_INVOKABLE void clearQueue();
     Q_INVOKABLE void play();
     Q_INVOKABLE void pause();
@@ -119,7 +121,8 @@ signals:
     void audioReactiveAvailabilityChanged();
 
 private:
-    QList<QUrl> validLocalFiles(const QList<QUrl> &urls) const;
+    QList<QUrl> validAudioSources(const QList<QUrl> &urls) const;
+    QList<QUrl> urlsFromSourceText(const QString &sourceText) const;
     void loadCurrent(bool autoplay, qint64 initialPosition = -1);
     void applyPendingSessionPosition();
     void applyTrackIdentity(const LocalTrackIdentity &identity);

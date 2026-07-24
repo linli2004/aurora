@@ -14,6 +14,7 @@ Item {
     property bool flowSceneEnabled: true
     property bool libraryMenuExpanded: false
     property bool tracksPanelExpanded: false
+    property bool sourcePanelExpanded: false
     property bool controlMode: false
     property bool momentFeedbackVisible: false
 
@@ -22,7 +23,9 @@ Item {
     readonly property string displayArtist:
         AudioRuntime.hasTrack ? AudioRuntime.artist : AuroraI18n.text("demo.artist")
     readonly property string displayArtistLine:
-        root.displayArtist === "Local audio" ? "" : root.displayArtist
+        root.displayArtist === "Local audio" || root.displayArtist === "Online source"
+        ? ""
+        : root.displayArtist
     readonly property string displayAlbum: AudioRuntime.hasTrack ? AudioRuntime.album : ""
     readonly property color displayIdentityColor:
         AudioRuntime.hasTrack && AudioRuntime.identityColorAvailable
@@ -37,6 +40,7 @@ Item {
         || root.controlMode
         || root.libraryMenuExpanded
         || root.tracksPanelExpanded
+        || root.sourcePanelExpanded
     readonly property real controlOpacity: root.controlsVisible ? 1.0 : 0.0
     readonly property bool emptyMusicPromptVisible:
         !AudioRuntime.hasTrack
@@ -92,8 +96,24 @@ Item {
 
     function revealControls() {
         root.controlMode = true
-        if (!root.libraryMenuExpanded && !root.tracksPanelExpanded)
+        if (!root.libraryMenuExpanded
+                && !root.tracksPanelExpanded
+                && !root.sourcePanelExpanded)
             controlHideTimer.restart()
+    }
+
+    function playSourceInput(append) {
+        const text = sourceInput.text.trim()
+        if (text.length === 0)
+            return
+
+        if (append)
+            AudioRuntime.appendSourcesFromText(text)
+        else
+            AudioRuntime.setQueueFromText(text)
+
+        sourceInput.focus = false
+        root.sourcePanelExpanded = false
     }
 
     function beginTrackTransition(direction) {
@@ -179,7 +199,14 @@ Item {
     onTracksPanelExpandedChanged: {
         if (tracksPanelExpanded)
             root.revealControls()
-        else if (!libraryMenuExpanded)
+        else if (!libraryMenuExpanded && !sourcePanelExpanded)
+            controlHideTimer.restart()
+    }
+
+    onSourcePanelExpandedChanged: {
+        if (sourcePanelExpanded)
+            root.revealControls()
+        else if (!libraryMenuExpanded && !tracksPanelExpanded)
             controlHideTimer.restart()
     }
 
@@ -190,7 +217,8 @@ Item {
         onTriggered: {
             if (!root.forceControlsVisible
                     && !root.libraryMenuExpanded
-                    && !root.tracksPanelExpanded)
+                    && !root.tracksPanelExpanded
+                    && !root.sourcePanelExpanded)
                 root.controlMode = false
         }
     }
@@ -208,6 +236,7 @@ Item {
         fileMode: FileDialog.OpenFiles
         nameFilters: [
             "Audio files (*.mp3 *.flac *.ogg *.opus *.wav *.m4a *.aac)",
+            "Playlists (*.m3u *.m3u8)",
             "All files (*)"
         ]
         onAccepted: AudioRuntime.setQueue(selectedFiles)
@@ -351,13 +380,18 @@ Item {
 
         Text {
             anchors.centerIn: parent
-            text: AuroraI18n.text("music.chooseMusic")
+            text: AuroraI18n.text("music.connectSource")
             color: AuroraTokens.mangaInk
             font.pixelSize: 14
             font.weight: Font.DemiBold
         }
 
-        TapHandler { onTapped: audioDialog.open() }
+        TapHandler {
+            onTapped: {
+                root.sourcePanelExpanded = true
+                root.revealControls()
+            }
+        }
 
         Behavior on opacity {
             NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
@@ -535,6 +569,181 @@ Item {
         }
 
         TapHandler { onTapped: root.diagnosticsVisible = !root.diagnosticsVisible }
+    }
+
+    Rectangle {
+        id: sourceButton
+
+        anchors.right: parent.right
+        anchors.rightMargin: 164
+        anchors.top: parent.top
+        anchors.topMargin: 28
+        width: 112
+        height: 42
+        enabled: root.controlsVisible
+        opacity: root.controlOpacity
+        scale: 0.965 + root.controlOpacity * 0.035
+        radius: 8
+        color: root.sourcePanelExpanded
+               ? Qt.rgba(root.displayIdentityColor.r,
+                         root.displayIdentityColor.g,
+                         root.displayIdentityColor.b, 0.20)
+               : root.mangaButtonFill
+        border.width: 2
+        border.color: root.sourcePanelExpanded
+                      ? root.displayIdentityColor
+                      : root.mangaButtonBorder
+
+        Text {
+            anchors.centerIn: parent
+            text: AuroraI18n.text("music.source")
+            color: root.mangaText
+            font.pixelSize: 13
+            font.weight: Font.DemiBold
+        }
+
+        TapHandler { onTapped: root.sourcePanelExpanded = !root.sourcePanelExpanded }
+
+        Behavior on opacity { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+    }
+
+    Rectangle {
+        anchors.right: parent.right
+        anchors.rightMargin: 28
+        anchors.top: sourceButton.bottom
+        anchors.topMargin: 10
+        width: Math.min(380, root.width - 56)
+        height: 166
+        visible: root.sourcePanelExpanded
+        opacity: root.sourcePanelExpanded ? 1.0 : 0.0
+        radius: 8
+        color: AuroraTokens.mangaPanel
+        border.width: 2
+        border.color: AuroraTokens.mangaInk
+        z: 20
+
+        Behavior on opacity { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+
+        Column {
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 9
+
+            Text {
+                width: parent.width
+                text: AuroraI18n.text("music.sourceHint")
+                color: root.mangaText
+                font.pixelSize: 12
+                font.weight: Font.DemiBold
+                elide: Text.ElideRight
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 66
+                radius: 8
+                color: AuroraTokens.mangaPaper
+                border.width: 2
+                border.color: sourceInput.activeFocus
+                              ? root.displayIdentityColor
+                              : AuroraTokens.mangaInk
+
+                TextEdit {
+                    id: sourceInput
+
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    color: root.mangaText
+                    selectionColor: Qt.rgba(root.displayIdentityColor.r,
+                                            root.displayIdentityColor.g,
+                                            root.displayIdentityColor.b, 0.42)
+                    selectedTextColor: AuroraTokens.mangaInk
+                    font.pixelSize: 12
+                    wrapMode: TextEdit.Wrap
+                    clip: true
+
+                    Text {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        text: "https://example.com/stream.mp3"
+                        color: root.mangaMutedText
+                        font.pixelSize: 12
+                        visible: sourceInput.text.length === 0
+                                 && !sourceInput.activeFocus
+                        elide: Text.ElideRight
+                    }
+                }
+            }
+
+            Row {
+                width: parent.width
+                height: 34
+                spacing: 8
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - 184
+                    text: AuroraI18n.text("music.sourceHelp")
+                    color: root.mangaMutedText
+                    font.pixelSize: 10
+                    wrapMode: Text.Wrap
+                }
+
+                Rectangle {
+                    width: 86
+                    height: 34
+                    radius: 8
+                    color: sourceInput.text.trim().length > 0
+                           ? Qt.rgba(root.displayIdentityColor.r,
+                                     root.displayIdentityColor.g,
+                                     root.displayIdentityColor.b, 0.18)
+                           : AuroraTokens.mangaWash
+                    border.width: 2
+                    border.color: AuroraTokens.mangaInk
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: AuroraI18n.text("music.appendSource")
+                        color: root.mangaText
+                        font.pixelSize: 11
+                        font.weight: Font.DemiBold
+                    }
+
+                    TapHandler {
+                        enabled: sourceInput.text.trim().length > 0
+                        onTapped: root.playSourceInput(true)
+                    }
+                }
+
+                Rectangle {
+                    width: 86
+                    height: 34
+                    radius: 8
+                    color: sourceInput.text.trim().length > 0
+                           ? Qt.rgba(root.displayIdentityColor.r,
+                                     root.displayIdentityColor.g,
+                                     root.displayIdentityColor.b, 0.22)
+                           : AuroraTokens.mangaWash
+                    border.width: 2
+                    border.color: AuroraTokens.mangaInk
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: AuroraI18n.text("music.playSource")
+                        color: root.mangaText
+                        font.pixelSize: 11
+                        font.weight: Font.DemiBold
+                    }
+
+                    TapHandler {
+                        enabled: sourceInput.text.trim().length > 0
+                        onTapped: root.playSourceInput(false)
+                    }
+                }
+            }
+        }
     }
 
     Rectangle {

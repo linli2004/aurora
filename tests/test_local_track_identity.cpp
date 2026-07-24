@@ -18,6 +18,7 @@ private slots:
     void filenameFallbackPreservesUnicode();
     void trackIdSurvivesRenameAndMove();
     void duplicateContentSharesTrackIdButNotSourceId();
+    void networkFallbackCreatesUrlIdentity();
     void resolvesEmbeddedMetadataAndArtwork();
     void prefersTrackArtistOverAlbumArtist();
 };
@@ -86,6 +87,22 @@ void LocalTrackIdentityTest::duplicateContentSharesTrackIdButNotSourceId()
 
     QCOMPARE(first.trackId, second.trackId);
     QVERIFY(first.sourceId != second.sourceId);
+}
+
+void LocalTrackIdentityTest::networkFallbackCreatesUrlIdentity()
+{
+    const QUrl source(QStringLiteral("https://example.com/music/night-signal.mp3?token=demo"));
+    const LocalTrackIdentity identity = LocalTrackIdentityResolver::fallbackFor(source);
+
+    QVERIFY(identity.trackId.startsWith(QStringLiteral("track:network-url:v1:")));
+    QVERIFY(identity.sourceId.startsWith(QStringLiteral("source:network-url:v1:")));
+    QVERIFY(identity.filePath.isEmpty());
+    QCOMPARE(identity.title, QStringLiteral("night-signal"));
+    QCOMPARE(identity.canonicalTitle, QStringLiteral("night-signal"));
+    QCOMPARE(identity.artist, QStringLiteral("Online source"));
+    QCOMPARE(identity.availability, QStringLiteral("Available"));
+    QVERIFY(!identity.metadataAvailable);
+    QCOMPARE(identity.provenance, QStringLiteral("Network source · URL fallback"));
 }
 
 void LocalTrackIdentityTest::resolvesEmbeddedMetadataAndArtwork()

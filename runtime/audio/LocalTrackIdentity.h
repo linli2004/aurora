@@ -40,7 +40,9 @@ public:
 private:
     [[nodiscard]] static QString canonicalFilePath(const QUrl &source);
     [[nodiscard]] static QString sourceIdForPath(const QString &filePath);
+    [[nodiscard]] static QString sourceIdForRemoteUrl(const QUrl &source);
     [[nodiscard]] static QString trackIdForFile(const QString &filePath, const QString &sourceId);
+    [[nodiscard]] static QString trackIdForRemoteUrl(const QUrl &source);
     [[nodiscard]] static QString normalizedText(const QString &value);
     [[nodiscard]] static QString firstMetadataText(
         const QMediaMetaData &metaData,

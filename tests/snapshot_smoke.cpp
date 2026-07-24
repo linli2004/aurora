@@ -67,6 +67,22 @@ QQuickItem *findAppShell(QQuickWindow *window)
     }
     return nullptr;
 }
+
+QQuickItem *findItemWithProperty(QQuickItem *item, const char *propertyName)
+{
+    if (!item)
+        return nullptr;
+
+    if (item->property(propertyName).isValid())
+        return item;
+
+    const QList<QQuickItem *> children = item->childItems();
+    for (QQuickItem *child : children) {
+        if (QQuickItem *match = findItemWithProperty(child, propertyName))
+            return match;
+    }
+    return nullptr;
+}
 }
 
 int main(int argc, char *argv[])
@@ -144,6 +160,15 @@ int main(int argc, char *argv[])
 
             if (QQuickItem *shell = findAppShell(window))
                 shell->setProperty("currentPage", 1);
+        }
+
+        if (mode == QStringLiteral("music-source-panel")) {
+            if (QQuickItem *shell = findAppShell(window))
+                shell->setProperty("currentPage", 1);
+            if (QQuickItem *musicSpace = findItemWithProperty(
+                    window->contentItem(), "sourcePanelExpanded")) {
+                musicSpace->setProperty("sourcePanelExpanded", true);
+            }
         }
 
         const int settleDelay = mode == QStringLiteral("music-presence") ? 4700 : 900;

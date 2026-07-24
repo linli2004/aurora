@@ -25,6 +25,22 @@ QString defaultArtworkCacheRoot()
 LocalTrackIdentity LocalTrackIdentityResolver::fallbackFor(const QUrl &source)
 {
     LocalTrackIdentity identity;
+    if (!source.isLocalFile()) {
+        const QString sourceName = QFileInfo(source.path()).completeBaseName();
+        identity.sourceId = sourceIdForRemoteUrl(source);
+        identity.trackId = trackIdForRemoteUrl(source);
+        identity.title = normalizedText(sourceName);
+        if (identity.title.isEmpty())
+            identity.title = normalizedText(source.host());
+        if (identity.title.isEmpty())
+            identity.title = QStringLiteral("Online source");
+        identity.canonicalTitle = identity.title.toCaseFolded();
+        identity.artist = QStringLiteral("Online source");
+        identity.availability = QStringLiteral("Available");
+        identity.provenance = QStringLiteral("Network source · URL fallback");
+        return identity;
+    }
+
     const QString resolvedPath = canonicalFilePath(source);
     const QFileInfo fileInfo(resolvedPath);
     identity.filePath = resolvedPath;
@@ -113,6 +129,19 @@ QString LocalTrackIdentityResolver::sourceIdForPath(const QString &filePath)
     return QStringLiteral("source:local-file:v1:") + QString::fromLatin1(digest.toHex());
 }
 
+QString LocalTrackIdentityResolver::sourceIdForRemoteUrl(const QUrl &source)
+{
+    const QByteArray normalizedUrl =
+        source.adjusted(QUrl::NormalizePathSegments | QUrl::RemovePassword).toEncoded();
+    if (normalizedUrl.isEmpty())
+        return {};
+
+    const QByteArray digest = QCryptographicHash::hash(
+        QByteArray("network-url-v1|") + normalizedUrl,
+        QCryptographicHash::Sha256);
+    return QStringLiteral("source:network-url:v1:") + QString::fromLatin1(digest.toHex());
+}
+
 QString LocalTrackIdentityResolver::trackIdForFile(const QString &filePath, const QString &sourceId)
 {
     QFile file(filePath);
@@ -140,6 +169,19 @@ QString LocalTrackIdentityResolver::trackIdForFile(const QString &filePath, cons
     }
 
     return QStringLiteral("track:local-content:v1:") + QString::fromLatin1(hash.result().toHex());
+}
+
+QString LocalTrackIdentityResolver::trackIdForRemoteUrl(const QUrl &source)
+{
+    const QByteArray normalizedUrl =
+        source.adjusted(QUrl::NormalizePathSegments | QUrl::RemovePassword).toEncoded();
+    if (normalizedUrl.isEmpty())
+        return {};
+
+    const QByteArray digest = QCryptographicHash::hash(
+        QByteArray("network-track-v1|") + normalizedUrl,
+        QCryptographicHash::Sha256);
+    return QStringLiteral("track:network-url:v1:") + QString::fromLatin1(digest.toHex());
 }
 
 QString LocalTrackIdentityResolver::normalizedText(const QString &value)

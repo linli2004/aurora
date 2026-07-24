@@ -2,7 +2,10 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QRegularExpression>
+#include <QSet>
 #include <QStandardPaths>
+#include <QTextStream>
 #include <QtGlobal>
 
 #include "runtime/AuroraTypes.h"
@@ -31,6 +34,25 @@ QList<QUrl> urlsFromSetting(const QVariant &value)
             urls.append(url);
     }
     return urls;
+}
+
+bool isRemoteAudioSource(const QUrl &url)
+{
+    const QString scheme = url.scheme().toCaseFolded();
+    return (scheme == QStringLiteral("http") || scheme == QStringLiteral("https"))
+        && !url.host().isEmpty();
+}
+
+bool isPlaylistFile(const QFileInfo &fileInfo)
+{
+    const QString suffix = fileInfo.suffix().toCaseFolded();
+    return suffix == QStringLiteral("m3u") || suffix == QStringLiteral("m3u8");
+}
+
+QString urlDedupeKey(const QUrl &url)
+{
+    return url.adjusted(QUrl::NormalizePathSegments | QUrl::RemovePassword)
+        .toString(QUrl::RemovePassword);
 }
 }
 
@@ -305,9 +327,9 @@ bool AudioRuntime::audioReactiveAvailable() const
 
 void AudioRuntime::setQueue(const QVariantList &urls)
 {
-    const QList<QUrl> filtered = validLocalFiles(AudioQueue::fromVariantList(urls));
+    const QList<QUrl> filtered = validAudioSources(AudioQueue::fromVariantList(urls));
     if (filtered.isEmpty()) {
-        setErrorString(tr("No readable local audio files were selected."));
+        setErrorString(tr("No playable audio sources were selected."));
         return;
     }
 
@@ -319,9 +341,40 @@ void AudioRuntime::setQueue(const QVariantList &urls)
 
 void AudioRuntime::appendFiles(const QVariantList &urls)
 {
-    const QList<QUrl> filtered = validLocalFiles(AudioQueue::fromVariantList(urls));
+    const QList<QUrl> filtered = validAudioSources(AudioQueue::fromVariantList(urls));
     if (filtered.isEmpty()) {
-        setErrorString(tr("No readable local audio files were selected."));
+        setErrorString(tr("No playable audio sources were selected."));
+        return;
+    }
+
+    const bool wasEmpty = m_queue.isEmpty();
+    m_queue.appendUrls(filtered);
+    emit queueChanged();
+
+    if (wasEmpty)
+        loadCurrent(true);
+    persistSession();
+}
+
+void AudioRuntime::setQueueFromText(const QString &sourceText)
+{
+    const QList<QUrl> filtered = validAudioSources(urlsFromSourceText(sourceText));
+    if (filtered.isEmpty()) {
+        setErrorString(tr("Paste a playable audio URL or M3U playlist content."));
+        return;
+    }
+
+    m_queue.setUrls(filtered);
+    emit queueChanged();
+    loadCurrent(true);
+    persistSession();
+}
+
+void AudioRuntime::appendSourcesFromText(const QString &sourceText)
+{
+    const QList<QUrl> filtered = validAudioSources(urlsFromSourceText(sourceText));
+    if (filtered.isEmpty()) {
+        setErrorString(tr("Paste a playable audio URL or M3U playlist content."));
         return;
     }
 
@@ -417,21 +470,97 @@ void AudioRuntime::setVolume(qreal volume)
     persistSession();
 }
 
-QList<QUrl> AudioRuntime::validLocalFiles(const QList<QUrl> &urls) const
+QList<QUrl> AudioRuntime::validAudioSources(const QList<QUrl> &urls) const
 {
     QList<QUrl> result;
     result.reserve(urls.size());
+    QSet<QString> seen;
+    QSet<QString> expandingPlaylists;
 
-    for (const QUrl &url : urls) {
-        if (!url.isLocalFile())
-            continue;
+    const auto appendUnique = [&seen, &result](const QUrl &url) {
+        const QString key = urlDedupeKey(url);
+        if (seen.contains(key))
+            return;
 
-        const QFileInfo fileInfo(url.toLocalFile());
-        if (fileInfo.exists() && fileInfo.isFile() && fileInfo.isReadable())
-            result.append(QUrl::fromLocalFile(fileInfo.canonicalFilePath()));
-    }
+        seen.insert(key);
+        result.append(url);
+    };
+
+    const auto appendValid = [this, &appendUnique, &expandingPlaylists](
+        const QList<QUrl> &candidates,
+        const QString &relativeBase,
+        const auto &appendValidRef) -> void {
+        for (const QUrl &url : candidates) {
+            QUrl resolvedUrl = url;
+            if (resolvedUrl.isRelative() && !relativeBase.isEmpty())
+                resolvedUrl = QUrl::fromLocalFile(QDir(relativeBase).filePath(resolvedUrl.toString()));
+
+            if (isRemoteAudioSource(resolvedUrl)) {
+                appendUnique(resolvedUrl);
+                continue;
+            }
+
+            const QFileInfo fileInfo(resolvedUrl.toLocalFile());
+            if (!fileInfo.exists() || !fileInfo.isFile() || !fileInfo.isReadable())
+                continue;
+
+            if (isPlaylistFile(fileInfo)) {
+                const QString playlistPath = QDir::cleanPath(fileInfo.canonicalFilePath());
+                if (playlistPath.isEmpty() || expandingPlaylists.contains(playlistPath))
+                    continue;
+
+                QFile file(playlistPath);
+                if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+                    continue;
+
+                expandingPlaylists.insert(playlistPath);
+                QTextStream stream(&file);
+                appendValidRef(urlsFromSourceText(stream.readAll()),
+                               QFileInfo(playlistPath).absolutePath(),
+                               appendValidRef);
+                expandingPlaylists.remove(playlistPath);
+                continue;
+            }
+
+            appendUnique(QUrl::fromLocalFile(QDir::cleanPath(fileInfo.canonicalFilePath())));
+        }
+    };
+
+    appendValid(urls, QString(), appendValid);
 
     return result;
+}
+
+QList<QUrl> AudioRuntime::urlsFromSourceText(const QString &sourceText) const
+{
+    QList<QUrl> urls;
+    const QStringList lines = sourceText.split(QRegularExpression(QStringLiteral("[\\r\\n]+")),
+                                               Qt::SkipEmptyParts);
+    urls.reserve(lines.size());
+
+    for (QString line : lines) {
+        line = line.trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+            continue;
+
+        const QFileInfo localPath(line);
+        if (localPath.isAbsolute()) {
+            urls.append(QUrl::fromLocalFile(line));
+            continue;
+        }
+
+        const QUrl rawUrl(line);
+        if (rawUrl.isRelative()) {
+            urls.append(rawUrl);
+            continue;
+        }
+
+        const QUrl url = QUrl::fromUserInput(line);
+        if (url.isValid() && !url.isEmpty())
+            urls.append(url);
+    }
+
+    return urls;
 }
 
 void AudioRuntime::loadCurrent(bool autoplay, qint64 initialPosition)
@@ -494,7 +623,7 @@ void AudioRuntime::restoreSession()
         return;
 
     const QVariantMap session = repository.setting(QStringLiteral("playback.session.v1"));
-    const QList<QUrl> urls = validLocalFiles(urlsFromSetting(session.value(QStringLiteral("urls"))));
+    const QList<QUrl> urls = validAudioSources(urlsFromSetting(session.value(QStringLiteral("urls"))));
     if (urls.isEmpty())
         return;
 
