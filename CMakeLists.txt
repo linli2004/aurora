@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick Multimedia Sql DBus)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick Multimedia Network Sql DBus)
 
 qt_standard_project_setup(REQUIRES 6.8)
 include(GNUInstallDirs)
@@ -38,6 +38,8 @@ qt_add_executable(aurora
     runtime/library/LocalLibraryWatcher.h
     runtime/platform/MprisService.cpp
     runtime/platform/MprisService.h
+    runtime/sources/MusicSourceRegistry.cpp
+    runtime/sources/MusicSourceRegistry.h
 )
 
 target_sources(aurora PRIVATE
@@ -114,6 +116,7 @@ target_link_libraries(aurora PRIVATE
     Qt6::Qml
     Qt6::Quick
     Qt6::Multimedia
+    Qt6::Network
     Qt6::Sql
     Qt6::DBus
 )
@@ -258,6 +261,8 @@ if(BUILD_TESTING)
         runtime/library/LocalLibraryTrackModel.h
         runtime/library/LocalLibraryWatcher.cpp
         runtime/library/LocalLibraryWatcher.h
+        runtime/sources/MusicSourceRegistry.cpp
+        runtime/sources/MusicSourceRegistry.h
     )
     target_sources(aurora_snapshot_smoke PRIVATE
         runtime/memory/MomentRepository.cpp
@@ -276,6 +281,7 @@ if(BUILD_TESTING)
         Qt6::Qml
         Qt6::Quick
         Qt6::Multimedia
+        Qt6::Network
         Qt6::Sql
     )
     qt_add_qml_module(aurora_snapshot_smoke
@@ -290,6 +296,19 @@ if(BUILD_TESTING)
             fixtures/moments.json
             fixtures/tracks.json
     )
+
+    qt_add_executable(aurora_music_source_registry_tests
+        tests/test_music_source_registry.cpp
+        runtime/sources/MusicSourceRegistry.cpp
+        runtime/sources/MusicSourceRegistry.h
+    )
+    target_include_directories(aurora_music_source_registry_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(aurora_music_source_registry_tests PRIVATE
+        Qt6::Core
+        Qt6::Network
+        Qt6::Test
+    )
+    add_test(NAME aurora.music_source_registry COMMAND aurora_music_source_registry_tests)
 
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)

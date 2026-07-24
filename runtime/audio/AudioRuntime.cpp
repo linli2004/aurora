@@ -39,8 +39,10 @@ QList<QUrl> urlsFromSetting(const QVariant &value)
 bool isRemoteAudioSource(const QUrl &url)
 {
     const QString scheme = url.scheme().toCaseFolded();
+    const QString path = url.path().toCaseFolded();
     return (scheme == QStringLiteral("http") || scheme == QStringLiteral("https"))
-        && !url.host().isEmpty();
+        && !url.host().isEmpty()
+        && !path.endsWith(QStringLiteral(".js"));
 }
 
 bool isPlaylistFile(const QFileInfo &fileInfo)
@@ -53,6 +55,40 @@ QString urlDedupeKey(const QUrl &url)
 {
     return url.adjusted(QUrl::NormalizePathSegments | QUrl::RemovePassword)
         .toString(QUrl::RemovePassword);
+}
+
+QStringList inputEntriesFromText(const QString &sourceText)
+{
+    QStringList entries;
+    const QStringList lines = sourceText.split(QRegularExpression(QStringLiteral("[\\r\\n]+")),
+                                               Qt::SkipEmptyParts);
+    const QRegularExpression urlExpression(QStringLiteral("https?://\\S+"));
+
+    for (QString line : lines) {
+        line = line.trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+            continue;
+
+        QRegularExpressionMatchIterator iterator = urlExpression.globalMatch(line);
+        QStringList urls;
+        while (iterator.hasNext()) {
+            QString url = iterator.next().captured(0);
+            while (!url.isEmpty() && QStringLiteral("。,.，);）]").contains(url.back()))
+                url.chop(1);
+            if (!url.isEmpty())
+                urls.append(url);
+        }
+
+        if (!urls.isEmpty()) {
+            entries.append(urls);
+            continue;
+        }
+
+        entries.append(line);
+    }
+
+    entries.removeDuplicates();
+    return entries;
 }
 }
 
@@ -534,28 +570,23 @@ QList<QUrl> AudioRuntime::validAudioSources(const QList<QUrl> &urls) const
 QList<QUrl> AudioRuntime::urlsFromSourceText(const QString &sourceText) const
 {
     QList<QUrl> urls;
-    const QStringList lines = sourceText.split(QRegularExpression(QStringLiteral("[\\r\\n]+")),
-                                               Qt::SkipEmptyParts);
-    urls.reserve(lines.size());
+    const QStringList entries = inputEntriesFromText(sourceText);
+    urls.reserve(entries.size());
 
-    for (QString line : lines) {
-        line = line.trimmed();
-        if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
-            continue;
-
-        const QFileInfo localPath(line);
+    for (const QString &entry : entries) {
+        const QFileInfo localPath(entry);
         if (localPath.isAbsolute()) {
-            urls.append(QUrl::fromLocalFile(line));
+            urls.append(QUrl::fromLocalFile(entry));
             continue;
         }
 
-        const QUrl rawUrl(line);
+        const QUrl rawUrl(entry);
         if (rawUrl.isRelative()) {
             urls.append(rawUrl);
             continue;
         }
 
-        const QUrl url = QUrl::fromUserInput(line);
+        const QUrl url = QUrl::fromUserInput(entry);
         if (url.isValid() && !url.isEmpty())
             urls.append(url);
     }

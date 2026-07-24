@@ -18,6 +18,7 @@
 #include "runtime/audio/AudioRuntime.h"
 #include "runtime/memory/MomentService.h"
 #include "runtime/library/LocalLibraryService.h"
+#include "runtime/sources/MusicSourceRegistry.h"
 
 namespace {
 bool ensureDemoAudioFile(const QString &path)
@@ -131,6 +132,15 @@ int main(int argc, char *argv[])
         "Moments",
         [](QQmlEngine *, QJSEngine *) -> QObject * {
             return new MomentService;
+        });
+
+    qmlRegisterSingletonType<MusicSourceRegistry>(
+        "Aurora.Runtime",
+        1,
+        0,
+        "MusicSources",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new MusicSourceRegistry;
         });
 
     QQmlApplicationEngine engine;

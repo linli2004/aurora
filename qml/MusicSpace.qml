@@ -54,6 +54,16 @@ Item {
         AudioRuntime.hasTrack
         && AudioRuntime.trackId.length > 0
         && AudioRuntime.filePath.length > 0
+    readonly property string sourcePanelStatus:
+        MusicSources.busy
+        ? AuroraI18n.text("music.sourceImporting")
+        : MusicSources.errorString.length > 0
+          ? MusicSources.errorString
+          : MusicSources.sourceCount > 0
+            ? AuroraI18n.text("music.sourceConnected")
+              + " " + MusicSources.sourceCount
+              + " · " + MusicSources.sourceNames.join(" / ")
+            : AuroraI18n.text("music.sourceEmpty")
     readonly property color mangaButtonFill: AuroraTokens.mangaPanel
     readonly property color mangaButtonBorder: AuroraTokens.mangaInk
     readonly property color mangaText: AuroraTokens.mangaInk
@@ -114,6 +124,15 @@ Item {
 
         sourceInput.focus = false
         root.sourcePanelExpanded = false
+    }
+
+    function importSourceInput() {
+        const text = sourceInput.text.trim()
+        if (text.length === 0)
+            return
+
+        MusicSources.importFromText(text)
+        sourceInput.focus = false
     }
 
     function beginTrackTransition(direction) {
@@ -613,8 +632,8 @@ Item {
         anchors.rightMargin: 28
         anchors.top: sourceButton.bottom
         anchors.topMargin: 10
-        width: Math.min(380, root.width - 56)
-        height: 166
+        width: Math.min(430, root.width - 56)
+        height: 250
         visible: root.sourcePanelExpanded
         opacity: root.sourcePanelExpanded ? 1.0 : 0.0
         radius: 8
@@ -641,7 +660,7 @@ Item {
 
             Rectangle {
                 width: parent.width
-                height: 66
+                height: 76
                 radius: 8
                 color: AuroraTokens.mangaPaper
                 border.width: 2
@@ -667,7 +686,7 @@ Item {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        text: "https://example.com/stream.mp3"
+                        text: AuroraI18n.text("music.sourcePlaceholder")
                         color: root.mangaMutedText
                         font.pixelSize: 12
                         visible: sourceInput.text.length === 0
@@ -682,17 +701,8 @@ Item {
                 height: 34
                 spacing: 8
 
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - 184
-                    text: AuroraI18n.text("music.sourceHelp")
-                    color: root.mangaMutedText
-                    font.pixelSize: 10
-                    wrapMode: Text.Wrap
-                }
-
                 Rectangle {
-                    width: 86
+                    width: 104
                     height: 34
                     radius: 8
                     color: sourceInput.text.trim().length > 0
@@ -705,7 +715,7 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: AuroraI18n.text("music.appendSource")
+                        text: AuroraI18n.text("music.importSource")
                         color: root.mangaText
                         font.pixelSize: 11
                         font.weight: Font.DemiBold
@@ -713,12 +723,12 @@ Item {
 
                     TapHandler {
                         enabled: sourceInput.text.trim().length > 0
-                        onTapped: root.playSourceInput(true)
+                        onTapped: root.importSourceInput()
                     }
                 }
 
                 Rectangle {
-                    width: 86
+                    width: 96
                     height: 34
                     radius: 8
                     color: sourceInput.text.trim().length > 0
@@ -731,7 +741,33 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: AuroraI18n.text("music.playSource")
+                        text: AuroraI18n.text("music.appendAddress")
+                        color: root.mangaText
+                        font.pixelSize: 11
+                        font.weight: Font.DemiBold
+                    }
+
+                    TapHandler {
+                        enabled: sourceInput.text.trim().length > 0
+                        onTapped: root.playSourceInput(true)
+                    }
+                }
+
+                Rectangle {
+                    width: 96
+                    height: 34
+                    radius: 8
+                    color: sourceInput.text.trim().length > 0
+                           ? Qt.rgba(root.displayIdentityColor.r,
+                                     root.displayIdentityColor.g,
+                                     root.displayIdentityColor.b, 0.22)
+                           : AuroraTokens.mangaWash
+                    border.width: 2
+                    border.color: AuroraTokens.mangaInk
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: AuroraI18n.text("music.playAddress")
                         color: root.mangaText
                         font.pixelSize: 11
                         font.weight: Font.DemiBold
@@ -741,6 +777,39 @@ Item {
                         enabled: sourceInput.text.trim().length > 0
                         onTapped: root.playSourceInput(false)
                     }
+                }
+            }
+
+            Text {
+                width: parent.width
+                text: AuroraI18n.text("music.sourceHelp")
+                color: root.mangaMutedText
+                font.pixelSize: 10
+                wrapMode: Text.Wrap
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 46
+                radius: 8
+                color: AuroraTokens.mangaWash
+                border.width: 1
+                border.color: Qt.rgba(AuroraTokens.mangaInk.r,
+                                      AuroraTokens.mangaInk.g,
+                                      AuroraTokens.mangaInk.b,
+                                      0.38)
+
+                Text {
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    text: root.sourcePanelStatus
+                    color: MusicSources.errorString.length > 0
+                           ? AuroraTokens.warmAccent
+                           : root.mangaMutedText
+                    font.pixelSize: 11
+                    wrapMode: Text.Wrap
+                    elide: Text.ElideRight
+                    maximumLineCount: 2
                 }
             }
         }
