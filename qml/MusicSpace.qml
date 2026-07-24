@@ -18,6 +18,7 @@ Item {
     property bool sourcePanelExpanded: false
     property bool controlMode: false
     property bool momentFeedbackVisible: false
+    property bool appendResolvedSource: false
 
     readonly property string displayTitle:
         AudioRuntime.hasTrack ? AudioRuntime.title : AuroraI18n.text("demo.track")
@@ -109,6 +110,15 @@ Item {
         }
     }
 
+    function sourceInputLooksLikeResolver(text) {
+        return /^[A-Za-z]{2,4}\s*[:/, ]\s*[A-Za-z0-9_.-]+(?:\s*[:/, ]\s*[A-Za-z0-9]+)?$/.test(text.trim())
+    }
+
+    function sourceInputLooksLikeScript(text) {
+        return /https?:\/\/\S+\.js(?:[?#]\S*)?/i.test(text)
+               || (text.indexOf("@name") >= 0 && text.indexOf("EVENT_NAMES") >= 0)
+    }
+
     function revealControls() {
         root.controlMode = true
         if (!root.libraryMenuExpanded
@@ -121,6 +131,16 @@ Item {
         const text = sourceInput.text.trim()
         if (text.length === 0)
             return
+
+        if (!append && root.sourceInputLooksLikeScript(text)) {
+            root.importSourceInput()
+            return
+        }
+
+        if (root.sourceInputLooksLikeResolver(text)) {
+            root.resolveSourceInput(append)
+            return
+        }
 
         if (append)
             AudioRuntime.appendSourcesFromText(text)
@@ -141,8 +161,9 @@ Item {
         sourceInput.focus = false
     }
 
-    function resolveSourceInput() {
+    function resolveSourceInput(append) {
         const text = sourceInput.text.trim()
+        root.appendResolvedSource = append === true
         if (text.length === 0)
             MusicSources.resolveDemoTrack()
         else
@@ -293,19 +314,28 @@ Item {
         target: MusicSources
 
         function onMusicUrlResolved(url) {
-            AudioRuntime.setQueueFromText(url)
+            if (root.appendResolvedSource)
+                AudioRuntime.appendSourcesFromText(url)
+            else
+                AudioRuntime.setQueueFromText(url)
+            root.appendResolvedSource = false
             root.sourcePanelExpanded = false
             root.tracksPanelExpanded = false
         }
 
         function onMusicUrlsResolved(urls) {
-            AudioRuntime.setQueueFromText(urls.join("\n"))
+            if (root.appendResolvedSource)
+                AudioRuntime.appendSourcesFromText(urls.join("\n"))
+            else
+                AudioRuntime.setQueueFromText(urls.join("\n"))
+            root.appendResolvedSource = false
             root.sourcePanelExpanded = false
             root.tracksPanelExpanded = false
         }
 
         function onMusicTracksResolved(tracks) {
             AudioRuntime.setQueueWithMetadata(tracks)
+            root.appendResolvedSource = false
             root.sourcePanelExpanded = false
             root.tracksPanelExpanded = false
         }
