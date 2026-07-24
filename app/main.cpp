@@ -8,6 +8,7 @@
 #include "runtime/AuroraTypes.h"
 #include "runtime/audio/AudioRuntime.h"
 #include "runtime/library/LocalLibraryService.h"
+#include "runtime/platform/MprisService.h"
 
 int main(int argc, char *argv[])
 {
@@ -33,14 +34,11 @@ int main(int argc, char *argv[])
             return new AuroraStateMapper;
         });
 
-    qmlRegisterSingletonType<AudioRuntime>(
-        "Aurora.Runtime",
-        1,
-        0,
-        "AudioRuntime",
-        [](QQmlEngine *, QJSEngine *) -> QObject * {
-            return new AudioRuntime;
-        });
+    AudioRuntime audioRuntime;
+    MprisService mprisService(&audioRuntime);
+    Q_UNUSED(mprisService);
+    qmlRegisterSingletonInstance(
+        "Aurora.Runtime", 1, 0, "AudioRuntime", &audioRuntime);
 
     qmlRegisterSingletonType<LocalLibraryService>(
         "Aurora.Runtime",

@@ -13,6 +13,8 @@
 - Throttled position writes to avoid updating SQLite for every media-player position signal.
 - Fixed startup position restore to wait for seekable media and confirm the applied position.
 - Added bounded retry handling for multimedia backends that ignore the first seek request.
+- Added minimal MPRIS service registration for Ubuntu media controls.
+- Exposed Play/Pause, Next, Previous, Stop, Seek, metadata, volume and playback status over D-Bus.
 - Added repository tests for schema creation, TrackSource persistence and duplicate content.
 - Added repository tests for track search and settings persistence.
 - Added stable local Track ID generation from bounded file-content sampling.
