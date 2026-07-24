@@ -57,6 +57,8 @@ Item {
     readonly property string sourcePanelStatus:
         MusicSources.busy
         ? AuroraI18n.text("music.sourceImporting")
+        : MusicSources.resolving
+          ? AuroraI18n.text("music.sourceResolving")
         : MusicSources.errorString.length > 0
           ? MusicSources.errorString
           : MusicSources.sourceCount > 0
@@ -132,6 +134,17 @@ Item {
             return
 
         MusicSources.importFromText(text)
+        sourceInput.text = ""
+        sourceInput.focus = false
+    }
+
+    function resolveSourceInput() {
+        const text = sourceInput.text.trim()
+        if (text.length === 0)
+            MusicSources.resolveDemoTrack()
+        else
+            MusicSources.resolveFromText(text)
+
         sourceInput.focus = false
     }
 
@@ -265,6 +278,15 @@ Item {
         id: libraryDialog
         title: AuroraI18n.text("music.folderDialog")
         onAccepted: LocalLibrary.scanDirectory(selectedFolder)
+    }
+
+    Connections {
+        target: MusicSources
+
+        function onMusicUrlResolved(url) {
+            AudioRuntime.setQueueFromText(url)
+            root.sourcePanelExpanded = false
+        }
     }
 
     MouseArea {
@@ -702,7 +724,7 @@ Item {
                 spacing: 8
 
                 Rectangle {
-                    width: 104
+                    width: 94
                     height: 34
                     radius: 8
                     color: sourceInput.text.trim().length > 0
@@ -728,10 +750,10 @@ Item {
                 }
 
                 Rectangle {
-                    width: 96
+                    width: 94
                     height: 34
                     radius: 8
-                    color: sourceInput.text.trim().length > 0
+                    color: MusicSources.sourceCount > 0 && !MusicSources.resolving
                            ? Qt.rgba(root.displayIdentityColor.r,
                                      root.displayIdentityColor.g,
                                      root.displayIdentityColor.b, 0.22)
@@ -741,20 +763,20 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: AuroraI18n.text("music.appendAddress")
+                        text: AuroraI18n.text("music.resolveSource")
                         color: root.mangaText
                         font.pixelSize: 11
                         font.weight: Font.DemiBold
                     }
 
                     TapHandler {
-                        enabled: sourceInput.text.trim().length > 0
-                        onTapped: root.playSourceInput(true)
+                        enabled: MusicSources.sourceCount > 0 && !MusicSources.resolving
+                        onTapped: root.resolveSourceInput()
                     }
                 }
 
                 Rectangle {
-                    width: 96
+                    width: 94
                     height: 34
                     radius: 8
                     color: sourceInput.text.trim().length > 0
@@ -776,6 +798,32 @@ Item {
                     TapHandler {
                         enabled: sourceInput.text.trim().length > 0
                         onTapped: root.playSourceInput(false)
+                    }
+                }
+
+                Rectangle {
+                    width: 94
+                    height: 34
+                    radius: 8
+                    color: sourceInput.text.trim().length > 0
+                           ? Qt.rgba(root.displayIdentityColor.r,
+                                     root.displayIdentityColor.g,
+                                     root.displayIdentityColor.b, 0.18)
+                           : AuroraTokens.mangaWash
+                    border.width: 2
+                    border.color: AuroraTokens.mangaInk
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: AuroraI18n.text("music.appendAddress")
+                        color: root.mangaText
+                        font.pixelSize: 11
+                        font.weight: Font.DemiBold
+                    }
+
+                    TapHandler {
+                        enabled: sourceInput.text.trim().length > 0
+                        onTapped: root.playSourceInput(true)
                     }
                 }
             }

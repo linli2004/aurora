@@ -15,6 +15,8 @@ private slots:
     void splitsSpaceSeparatedScriptUrls();
     void parsesOneLineLxScriptMetadata();
     void importsLocalScriptFileOnce();
+    void resolvesMockScriptMusicUrl();
+    void resolvesConfiguredRealSourceMusicUrl();
 };
 
 void MusicSourceRegistryTest::splitsSpaceSeparatedScriptUrls()
@@ -77,6 +79,92 @@ void MusicSourceRegistryTest::importsLocalScriptFileOnce()
 
     registry.importFromText(filePath);
     QCOMPARE(registry.sourceCount(), 1);
+}
+
+void MusicSourceRegistryTest::resolvesMockScriptMusicUrl()
+{
+    QCoreApplication::setOrganizationName(QStringLiteral("AuroraTests"));
+    QCoreApplication::setApplicationName(
+        QStringLiteral("MusicSourceResolver-%1").arg(QUuid::createUuid().toString(QUuid::Id128)));
+    QSettings().clear();
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString filePath = directory.filePath(QStringLiteral("resolver.js"));
+    QFile file(filePath);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+    file.write(
+        "/** * @name Resolver * @version 1 */ "
+        "const { EVENT_NAMES, on, send } = globalThis.lx; "
+        "on(EVENT_NAMES.request, ({ action, source, info }) => { "
+        "  const songId = info.musicInfo.hash ?? info.musicInfo.songmid; "
+        "  if (action !== 'musicUrl') return Promise.reject(new Error('bad action')); "
+        "  if (source !== 'wy' || info.type !== '128k' || songId !== '33894312') return Promise.reject(new Error('bad request')); "
+        "  return Promise.resolve('https://example.com/demo.mp3'); "
+        "}); "
+        "send(EVENT_NAMES.inited, { sources: { wy: { name: 'wy', type: 'music', actions: ['musicUrl'], qualitys: ['128k'] } } });");
+    file.close();
+
+    MusicSourceRegistry registry;
+    registry.importFromText(filePath);
+    QCOMPARE(registry.sourceCount(), 1);
+
+    QSignalSpy resolvedSpy(&registry, &MusicSourceRegistry::musicUrlResolved);
+    registry.resolveFromText(QStringLiteral("wy:33894312 128k"));
+
+    QVERIFY2(
+        resolvedSpy.wait(2000),
+        qPrintable(QStringLiteral("error=%1 status=%2 resolving=%3")
+                       .arg(registry.errorString(), registry.statusText())
+                       .arg(registry.resolving())));
+    QCOMPARE(resolvedSpy.takeFirst().at(0).toString(), QStringLiteral("https://example.com/demo.mp3"));
+    QVERIFY(!registry.resolving());
+}
+
+void MusicSourceRegistryTest::resolvesConfiguredRealSourceMusicUrl()
+{
+    const QString scriptPath = QString::fromUtf8(qgetenv("AURORA_REAL_SOURCE_SCRIPT"));
+    if (scriptPath.isEmpty())
+        QSKIP("Set AURORA_REAL_SOURCE_SCRIPT to run a real LX source resolver.");
+
+    QCoreApplication::setOrganizationName(QStringLiteral("AuroraTests"));
+    QCoreApplication::setApplicationName(
+        QStringLiteral("MusicSourceRealResolver-%1").arg(QUuid::createUuid().toString(QUuid::Id128)));
+    QSettings().clear();
+
+    MusicSourceRegistry registry;
+    registry.importFromText(scriptPath);
+    if (registry.busy())
+        QTRY_VERIFY_WITH_TIMEOUT(!registry.busy(), 20000);
+
+    QVERIFY2(
+        registry.sourceCount() > 0,
+        qPrintable(QStringLiteral("error=%1 status=%2")
+                       .arg(registry.errorString(), registry.statusText())));
+
+    const QString requestText = QString::fromUtf8(qgetenv("AURORA_REAL_SOURCE_REQUEST"))
+                                    .simplified()
+                                    .isEmpty()
+        ? QStringLiteral("wy:33894312 128k")
+        : QString::fromUtf8(qgetenv("AURORA_REAL_SOURCE_REQUEST")).simplified();
+
+    QSignalSpy resolvedSpy(&registry, &MusicSourceRegistry::musicUrlResolved);
+    registry.resolveFromText(requestText);
+
+    QVERIFY2(
+        resolvedSpy.wait(20000),
+        qPrintable(QStringLiteral("request=%1 error=%2 status=%3 resolving=%4")
+                       .arg(requestText, registry.errorString(), registry.statusText())
+                       .arg(registry.resolving())));
+
+    const QString resolvedUrl = resolvedSpy.takeFirst().at(0).toString();
+    const QUrl url = QUrl::fromUserInput(resolvedUrl);
+    QVERIFY2(
+        (url.scheme() == QStringLiteral("http") || url.scheme() == QStringLiteral("https"))
+            && !url.host().isEmpty()
+            && !url.path().endsWith(QStringLiteral(".js")),
+        qPrintable(resolvedUrl));
 }
 
 QTEST_MAIN(MusicSourceRegistryTest)

@@ -302,10 +302,14 @@ if(BUILD_TESTING)
         runtime/sources/MusicSourceRegistry.cpp
         runtime/sources/MusicSourceRegistry.h
     )
+    set_target_properties(aurora_music_source_registry_tests PROPERTIES
+        QT_QML_MODULE_NO_IMPORT_SCAN TRUE
+    )
     target_include_directories(aurora_music_source_registry_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(aurora_music_source_registry_tests PRIVATE
         Qt6::Core
         Qt6::Network
+        Qt6::Qml
         Qt6::Test
     )
     add_test(NAME aurora.music_source_registry COMMAND aurora_music_source_registry_tests)
