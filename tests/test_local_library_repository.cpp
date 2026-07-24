@@ -14,6 +14,8 @@ class LocalLibraryRepositoryTest final : public QObject
 private slots:
     void createsSchemaAndPersistsTrackSource();
     void duplicateContentCreatesOneTrackAndMultipleSources();
+    void marksMissingSourcesUnavailable();
+    void movedFileRelinksByStableTrackIdentity();
     void readsTracksWithSearchText();
     void persistsSettings();
 };
@@ -74,7 +76,80 @@ void LocalLibraryRepositoryTest::duplicateContentCreatesOneTrackAndMultipleSourc
 
     QCOMPARE(repository.trackCount(), 1);
     QCOMPARE(repository.sourceCount(), 2);
-    QCOMPARE(repository.playableFilePaths().size(), 2);
+    QCOMPARE(repository.playableFilePaths().size(), 1);
+    QCOMPARE(repository.tracks().size(), 1);
+}
+
+void LocalLibraryRepositoryTest::marksMissingSourcesUnavailable()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString audioPath = directory.filePath(QStringLiteral("missing.mp3"));
+    QFile audioFile(audioPath);
+    QVERIFY(audioFile.open(QIODevice::WriteOnly));
+    audioFile.write("missing source bytes");
+    audioFile.close();
+
+    LocalLibraryRepository repository(QStringLiteral("aurora-repo-test-missing"));
+    QVERIFY(repository.open(directory.filePath(QStringLiteral("library.sqlite"))));
+    QVERIFY2(repository.upsertSource(recordForFile(audioPath)),
+             qPrintable(repository.lastError()));
+
+    QVERIFY(QFile::remove(audioPath));
+
+    int markedMissing = 0;
+    QVERIFY2(repository.reconcileMissingSources(&markedMissing),
+             qPrintable(repository.lastError()));
+    QCOMPARE(markedMissing, 1);
+    QCOMPARE(repository.trackCount(), 0);
+    QCOMPARE(repository.sourceCount(), 0);
+    QCOMPARE(repository.missingSourceCount(), 1);
+    QVERIFY(repository.playableFilePaths().isEmpty());
+    QVERIFY(repository.tracks().isEmpty());
+}
+
+void LocalLibraryRepositoryTest::movedFileRelinksByStableTrackIdentity()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString oldPath = directory.filePath(QStringLiteral("before.mp3"));
+    const QString newPath = directory.filePath(QStringLiteral("after.mp3"));
+
+    QFile audioFile(oldPath);
+    QVERIFY(audioFile.open(QIODevice::WriteOnly));
+    audioFile.write("stable moved audio bytes");
+    audioFile.close();
+
+    LocalLibraryRepository repository(QStringLiteral("aurora-repo-test-moved"));
+    QVERIFY(repository.open(directory.filePath(QStringLiteral("library.sqlite"))));
+
+    const LocalLibrarySourceRecord original = recordForFile(oldPath);
+    QVERIFY2(repository.upsertSource(original), qPrintable(repository.lastError()));
+    QVERIFY(QFile::rename(oldPath, newPath));
+
+    const LocalLibrarySourceRecord moved = recordForFile(newPath);
+    QCOMPARE(moved.identity.trackId, original.identity.trackId);
+    QVERIFY(moved.identity.sourceId != original.identity.sourceId);
+    QVERIFY2(repository.upsertSource(moved), qPrintable(repository.lastError()));
+
+    int markedMissing = 0;
+    QVERIFY2(repository.reconcileMissingSources(&markedMissing),
+             qPrintable(repository.lastError()));
+
+    QCOMPARE(markedMissing, 1);
+    QCOMPARE(repository.trackCount(), 1);
+    QCOMPARE(repository.sourceCount(), 1);
+    QCOMPARE(repository.missingSourceCount(), 1);
+    QCOMPARE(repository.playableFilePaths(),
+             QStringList{QFileInfo(newPath).canonicalFilePath()});
+
+    const QList<LocalLibraryTrackRecord> visibleTracks = repository.tracks();
+    QCOMPARE(visibleTracks.size(), 1);
+    QCOMPARE(visibleTracks.first().trackId, original.identity.trackId);
+    QCOMPARE(visibleTracks.first().filePath,
+             QFileInfo(newPath).canonicalFilePath());
 }
 
 void LocalLibraryRepositoryTest::readsTracksWithSearchText()
