@@ -8,6 +8,7 @@ Item {
     property int qualityMode: AuroraTypes.Balanced
     property bool identityVisible: true
     property bool transitioning: false
+    property bool memoryPanelExpanded: false
 
     signal closeRequested()
     signal recallMoment(string momentId)
@@ -45,6 +46,15 @@ Item {
         }
     }
 
+    MangaBackdrop {
+        anchors.fill: parent
+        accentColor: Moments.selectedIdentityColor
+        secondaryColor: AuroraTokens.memoryAccent
+        energy: Moments.momentCount > 0 ? 0.26 : 0.12
+        accessibilityMode: root.accessibilityMode
+        qualityMode: root.qualityMode
+    }
+
     AtmosphereField {
         anchors.fill: parent
         primaryColor: Moments.selectedIdentityColor
@@ -52,6 +62,8 @@ Item {
         presenceLevel: 0.20
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
+        paperMode: true
+        opacity: 0.16
     }
 
     Rectangle {
@@ -60,16 +72,17 @@ Item {
         anchors.margins: 28
         width: 88
         height: 42
-        radius: 21
-        color: Qt.rgba(1, 1, 1, 0.07)
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.10)
+        radius: 8
+        color: AuroraTokens.mangaPanel
+        border.width: 2
+        border.color: AuroraTokens.mangaInk
 
         Text {
             anchors.centerIn: parent
-            text: "Back"
-            color: AuroraTokens.textSecondary
+            text: AuroraI18n.text("memory.back")
+            color: AuroraTokens.mangaInk
             font.pixelSize: 14
+            font.weight: Font.DemiBold
         }
 
         TapHandler { onTapped: root.closeRequested() }
@@ -83,25 +96,25 @@ Item {
         spacing: 7
 
         Text {
-            text: "MEMORY"
-            color: AuroraTokens.textSecondary
+            text: AuroraI18n.traditionalChinese ? "記憶" : "MEMORY"
+            color: AuroraTokens.mangaInk
             font.pixelSize: 12
             font.letterSpacing: 4
             font.weight: Font.DemiBold
         }
 
         Text {
-            text: "Your moments."
-            color: AuroraTokens.textPrimary
+            text: AuroraI18n.text("memory.hero")
+            color: AuroraTokens.mangaInk
             font.pixelSize: Math.max(30, root.width * 0.038)
             font.weight: Font.DemiBold
         }
 
         Text {
             text: Moments.momentCount === 1
-                  ? "1 moment kept on this device"
-                  : Moments.momentCount + " moments kept on this device"
-            color: AuroraTokens.textSecondary
+                  ? AuroraI18n.text("memory.countOne")
+                  : Moments.momentCount + " " + AuroraI18n.text("memory.countMany")
+            color: AuroraTokens.mangaMuted
             font.pixelSize: 14
         }
     }
@@ -109,7 +122,9 @@ Item {
     AuroraMoment {
         id: featuredMoment
 
-        x: Math.max(56, (memoryPanel.x - width) / 2)
+        x: root.memoryPanelExpanded
+           ? Math.max(56, (memoryPanel.x - width) / 2)
+           : (root.width - width) / 2
         anchors.verticalCenter: parent.verticalCenter
         sizePreset: root.width < 1080 ? 0 : 1
         title: Moments.selectedHeading
@@ -132,6 +147,7 @@ Item {
         identityVisible: root.identityVisible
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
+        mangaMode: true
         visible: Moments.momentCount > 0
 
         onActivated: {
@@ -155,9 +171,9 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         text: Moments.selectedAvailable
               ? Moments.selectedCreatedLabel
-              : "Music source unavailable · memory preserved"
+              : AuroraI18n.text("memory.unavailable")
         color: Moments.selectedAvailable
-               ? AuroraTokens.textMuted
+               ? AuroraTokens.mangaMuted
                : AuroraTokens.warmAccent
         font.pixelSize: 11
         elide: Text.ElideRight
@@ -170,21 +186,24 @@ Item {
         anchors.topMargin: 38
         width: 126
         height: 38
-        radius: 19
+        radius: 8
         visible: Moments.momentCount > 0
         color: Moments.selectedAvailable
                ? Qt.rgba(Moments.selectedIdentityColor.r,
                          Moments.selectedIdentityColor.g,
                          Moments.selectedIdentityColor.b, 0.18)
-               : Qt.rgba(1, 1, 1, 0.055)
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.10)
+               : AuroraTokens.mangaWash
+        border.width: 2
+        border.color: AuroraTokens.mangaInk
 
         Text {
             anchors.centerIn: parent
-            text: Moments.selectedAvailable ? "Recall moment" : "Manage sources"
-            color: AuroraTokens.textSecondary
+            text: Moments.selectedAvailable
+                  ? AuroraI18n.text("memory.recall")
+                  : AuroraI18n.text("memory.manageSources")
+            color: AuroraTokens.mangaInk
             font.pixelSize: 12
+            font.weight: Font.DemiBold
         }
 
         TapHandler {
@@ -198,6 +217,31 @@ Item {
     }
 
     Rectangle {
+        anchors.horizontalCenter: featuredMoment.horizontalCenter
+        anchors.top: featuredMoment.bottom
+        anchors.topMargin: 84
+        width: 132
+        height: 38
+        radius: 8
+        visible: Moments.momentCount > 0
+        color: AuroraTokens.mangaPanel
+        border.width: 2
+        border.color: AuroraTokens.mangaInk
+
+        Text {
+            anchors.centerIn: parent
+            text: root.memoryPanelExpanded
+                  ? AuroraI18n.text("memory.closeFlow")
+                  : AuroraI18n.text("memory.openFlow")
+            color: AuroraTokens.mangaInk
+            font.pixelSize: 12
+            font.weight: Font.DemiBold
+        }
+
+        TapHandler { onTapped: root.memoryPanelExpanded = !root.memoryPanelExpanded }
+    }
+
+    Rectangle {
         id: memoryPanel
 
         anchors.right: parent.right
@@ -207,9 +251,19 @@ Item {
         anchors.topMargin: 104
         width: Math.min(410, root.width * 0.34)
         radius: 12
-        color: Qt.rgba(0.035, 0.042, 0.055, 0.82)
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.10)
+        visible: root.memoryPanelExpanded
+        enabled: root.memoryPanelExpanded
+        opacity: root.memoryPanelExpanded ? 1.0 : 0.0
+        color: AuroraTokens.mangaPanel
+        border.width: 3
+        border.color: AuroraTokens.mangaInk
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: AuroraTokens.motionSoft
+                easing.type: Easing.OutCubic
+            }
+        }
 
         Column {
             anchors.fill: parent
@@ -224,8 +278,8 @@ Item {
                 Text {
                     width: parent.width - 90
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Memory flow"
-                    color: AuroraTokens.textSecondary
+                    text: AuroraI18n.text("memory.title")
+                    color: AuroraTokens.mangaInk
                     font.pixelSize: 13
                     font.weight: Font.DemiBold
                 }
@@ -235,7 +289,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     horizontalAlignment: Text.AlignRight
                     text: Moments.momentCount
-                    color: AuroraTokens.textMuted
+                    color: AuroraTokens.mangaMuted
                     font.pixelSize: 12
                 }
             }
@@ -259,13 +313,17 @@ Item {
                            ? Qt.rgba(modelData.identityColor.r,
                                      modelData.identityColor.g,
                                      modelData.identityColor.b, 0.16)
-                           : Qt.rgba(1, 1, 1, 0.045)
-                    border.width: 1
+                           : Qt.rgba(AuroraTokens.mangaInk.r,
+                                     AuroraTokens.mangaInk.g,
+                                     AuroraTokens.mangaInk.b,
+                                     0.045)
+                    border.width: 2
                     border.color: Moments.selectedMomentId === modelData.momentId
-                                  ? Qt.rgba(modelData.identityColor.r,
-                                            modelData.identityColor.g,
-                                            modelData.identityColor.b, 0.38)
-                                  : Qt.rgba(1, 1, 1, 0.075)
+                                  ? modelData.identityColor
+                                  : Qt.rgba(AuroraTokens.mangaInk.r,
+                                            AuroraTokens.mangaInk.g,
+                                            AuroraTokens.mangaInk.b,
+                                            0.20)
 
                     Rectangle {
                         anchors.left: parent.left
@@ -277,13 +335,15 @@ Item {
                         color: Qt.rgba(modelData.identityColor.r,
                                        modelData.identityColor.g,
                                        modelData.identityColor.b, 0.22)
+                        border.width: 2
+                        border.color: AuroraTokens.mangaInk
 
                         Text {
                             anchors.centerIn: parent
                             text: modelData.title.length > 0
                                   ? modelData.title.charAt(0).toUpperCase()
                                   : "M"
-                            color: AuroraTokens.textPrimary
+                            color: AuroraTokens.mangaInk
                             font.pixelSize: 18
                             font.weight: Font.DemiBold
                         }
@@ -300,7 +360,7 @@ Item {
                         Text {
                             width: parent.width
                             text: modelData.title
-                            color: AuroraTokens.textSecondary
+                            color: AuroraTokens.mangaInk
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
                             elide: Text.ElideRight
@@ -311,7 +371,7 @@ Item {
                             text: modelData.confirmedMeaning.length > 0
                                   ? modelData.confirmedMeaning
                                   : modelData.heading + " · " + modelData.artist
-                            color: AuroraTokens.textMuted
+                            color: AuroraTokens.mangaMuted
                             font.pixelSize: 10
                             elide: Text.ElideRight
                         }
@@ -339,9 +399,9 @@ Item {
                     anchors.centerIn: parent
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
-                    text: "Keep a moment in Music Space to begin."
+                    text: AuroraI18n.text("memory.empty")
                     visible: momentList.count === 0
-                    color: AuroraTokens.textMuted
+                    color: AuroraTokens.mangaMuted
                     font.pixelSize: 12
                     wrapMode: Text.Wrap
                 }
@@ -350,12 +410,15 @@ Item {
             Rectangle {
                 width: parent.width
                 height: 1
-                color: Qt.rgba(1, 1, 1, 0.08)
+                color: Qt.rgba(AuroraTokens.mangaInk.r,
+                               AuroraTokens.mangaInk.g,
+                               AuroraTokens.mangaInk.b,
+                               0.18)
             }
 
             Text {
-                text: "Your meaning"
-                color: AuroraTokens.textSecondary
+                text: AuroraI18n.text("memory.meaning")
+                color: AuroraTokens.mangaInk
                 font.pixelSize: 12
                 font.weight: Font.DemiBold
             }
@@ -364,25 +427,23 @@ Item {
                 width: parent.width
                 height: Math.max(92, parent.height - momentList.height - 144)
                 radius: 9
-                color: Qt.rgba(1, 1, 1, 0.045)
-                border.width: 1
+                color: AuroraTokens.mangaPaper
+                border.width: 2
                 border.color: meaningInput.activeFocus
-                              ? Qt.rgba(Moments.selectedIdentityColor.r,
-                                        Moments.selectedIdentityColor.g,
-                                        Moments.selectedIdentityColor.b, 0.40)
-                              : Qt.rgba(1, 1, 1, 0.08)
+                              ? Moments.selectedIdentityColor
+                              : AuroraTokens.mangaInk
 
                 TextEdit {
                     id: meaningInput
 
                     anchors.fill: parent
                     anchors.margins: 11
-                    color: AuroraTokens.textPrimary
+                    color: AuroraTokens.mangaInk
                     selectionColor: Qt.rgba(
                                         Moments.selectedIdentityColor.r,
                                         Moments.selectedIdentityColor.g,
                                         Moments.selectedIdentityColor.b, 0.42)
-                    selectedTextColor: AuroraTokens.textPrimary
+                    selectedTextColor: AuroraTokens.mangaInk
                     font.pixelSize: 12
                     wrapMode: TextEdit.Wrap
                     enabled: Moments.selectedMomentId.length > 0
@@ -393,8 +454,8 @@ Item {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 11
-                    text: "Add only what this moment means to you."
-                    color: AuroraTokens.textMuted
+                    text: AuroraI18n.text("memory.meaningHint")
+                    color: AuroraTokens.mangaMuted
                     font.pixelSize: 12
                     wrapMode: Text.Wrap
                     visible: meaningInput.text.length === 0
@@ -415,7 +476,7 @@ Item {
                           : Moments.lastStatus
                     color: Moments.errorString.length > 0
                            ? AuroraTokens.warmAccent
-                           : AuroraTokens.textMuted
+                           : AuroraTokens.mangaMuted
                     font.pixelSize: 10
                     elide: Text.ElideRight
                 }
@@ -423,22 +484,23 @@ Item {
                 Rectangle {
                     width: 114
                     height: 34
-                    radius: 17
+                    radius: 8
                     color: Moments.selectedMomentId.length > 0
                            ? Qt.rgba(Moments.selectedIdentityColor.r,
                                      Moments.selectedIdentityColor.g,
                                      Moments.selectedIdentityColor.b, 0.18)
-                           : Qt.rgba(1, 1, 1, 0.04)
-                    border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, 0.10)
+                           : AuroraTokens.mangaWash
+                    border.width: 2
+                    border.color: AuroraTokens.mangaInk
 
                     Text {
                         anchors.centerIn: parent
                         text: meaningInput.text.trim().length > 0
-                              ? "Save meaning"
-                              : "Clear meaning"
-                        color: AuroraTokens.textSecondary
+                              ? AuroraI18n.text("memory.saveMeaning")
+                              : AuroraI18n.text("memory.clearMeaning")
+                        color: AuroraTokens.mangaInk
                         font.pixelSize: 11
+                        font.weight: Font.DemiBold
                     }
 
                     TapHandler {

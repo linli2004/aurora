@@ -13,6 +13,7 @@ FocusScope {
     property int availability: AuroraTypes.AvailabilityActive
     property bool recallEnabled: true
     property bool identityVisible: true
+    property bool mangaMode: false
 
     property string momentId: "moment-demo"
     property string title: "Late Summer Night"
@@ -48,6 +49,20 @@ FocusScope {
     readonly property color semanticAccent: AuroraTokens.momentAccent(experienceState)
     readonly property real semanticPresence: AuroraTokens.momentPresence(experienceState)
     readonly property real semanticOpacity: AuroraTokens.momentOpacity(experienceState)
+    readonly property color resolvedPrimaryText:
+        root.mangaMode ? AuroraTokens.mangaInk : AuroraTokens.textPrimary
+    readonly property color resolvedSecondaryText:
+        root.mangaMode ? AuroraTokens.mangaMuted : AuroraTokens.textSecondary
+    readonly property color resolvedMutedText:
+        root.mangaMode ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                 AuroraTokens.mangaInk.g,
+                                 AuroraTokens.mangaInk.b,
+                                 0.54)
+                       : AuroraTokens.textMuted
+    readonly property string trackArtistLine:
+        root.artist.length > 0
+        ? root.trackTitle + "  ·  " + root.artist
+        : root.trackTitle
 
     width: componentSize
     height: componentSize
@@ -73,12 +88,17 @@ FocusScope {
         id: surface
         anchors.fill: parent
         radius: AuroraTokens.momentRadius(root.sizePreset)
-        color: root.accessibilityMode === AuroraTypes.HighContrast
+        color: root.mangaMode
+               ? AuroraTokens.mangaPanel
+               : root.accessibilityMode === AuroraTypes.HighContrast
                ? AuroraTokens.surfaceHighContrast
                : AuroraTokens.surfacePrimary
-        border.width: root.activeFocus ? 3 : (root.remembered ? 2 : 1)
+        border.width: root.mangaMode ? (root.activeFocus ? 4 : 3)
+                                     : root.activeFocus ? 3 : (root.remembered ? 2 : 1)
         border.color: root.activeFocus
                       ? AuroraTokens.focusRing
+                      : root.mangaMode
+                        ? AuroraTokens.mangaInk
                       : root.remembered
                         ? Qt.rgba(root.semanticAccent.r,
                                   root.semanticAccent.g,
@@ -100,6 +120,25 @@ FocusScope {
             presenceLevel: root.semanticPresence
             accessibilityMode: root.accessibilityMode
             qualityMode: root.qualityMode
+            paperMode: root.mangaMode
+            opacity: root.mangaMode ? 0.16 : 1.0
+        }
+
+        Repeater {
+            model: root.mangaMode ? 9 : 0
+
+            delegate: Rectangle {
+                required property int index
+
+                width: parent.width * (0.24 + index * 0.035)
+                height: 2
+                radius: 1
+                x: parent.width * (0.03 + index * 0.038)
+                y: parent.height * (0.16 + index * 0.055)
+                rotation: -19
+                color: AuroraTokens.mangaInk
+                opacity: 0.05 + root.semanticPresence * 0.05
+            }
         }
 
         // Temporal trace: a restrained horizontal memory mark, never a rarity badge.
@@ -111,7 +150,7 @@ FocusScope {
             width: parent.width * (root.remembered ? 0.28 : 0.14)
             height: Math.max(1, parent.width * 0.006)
             radius: height / 2
-            color: root.semanticAccent
+            color: root.mangaMode ? AuroraTokens.mangaInk : root.semanticAccent
             opacity: root.archived ? 0.20 : root.remembered ? 0.62 : 0.28
 
             Behavior on width {
@@ -138,6 +177,8 @@ FocusScope {
             context: AuroraTypes.Moment
             accessibilityMode: root.accessibilityMode
             qualityMode: root.qualityMode
+            heroMode: root.mangaMode
+            mangaMode: root.mangaMode
             opacity: root.identityVisible ? 1.0 : 0.0
 
             Behavior on opacity {
@@ -160,7 +201,7 @@ FocusScope {
             Text {
                 width: parent.width
                 text: root.periodLabel
-                color: AuroraTokens.textSecondary
+                color: root.resolvedSecondaryText
                 opacity: root.archived ? 0.62 : 1.0
                 font.pixelSize: Math.max(12, root.width * 0.035)
                 elide: Text.ElideRight
@@ -169,7 +210,7 @@ FocusScope {
             Text {
                 width: parent.width
                 text: root.title
-                color: AuroraTokens.textPrimary
+                color: root.resolvedPrimaryText
                 opacity: root.archived ? 0.72 : 1.0
                 font.pixelSize: Math.max(22, root.width * 0.065)
                 font.weight: Font.DemiBold
@@ -180,8 +221,8 @@ FocusScope {
 
             Text {
                 width: parent.width
-                text: root.trackTitle + "  ·  " + root.artist
-                color: AuroraTokens.textSecondary
+                text: root.trackArtistLine
+                color: root.resolvedSecondaryText
                 opacity: root.archived ? 0.58 : 1.0
                 font.pixelSize: Math.max(13, root.width * 0.036)
                 elide: Text.ElideRight
@@ -191,7 +232,7 @@ FocusScope {
                 width: parent.width
                 visible: root.hasConfirmedMeaning
                 text: root.confirmedUserNote
-                color: AuroraTokens.textPrimary
+                color: root.resolvedPrimaryText
                 opacity: root.archived ? 0.56 : 0.78
                 font.pixelSize: Math.max(12, root.width * 0.033)
                 maximumLineCount: 1
@@ -211,7 +252,7 @@ FocusScope {
                 width: parent.width
                 visible: root.archived
                 text: "Archived · Recall remains available"
-                color: AuroraTokens.textMuted
+                color: root.resolvedMutedText
                 font.pixelSize: Math.max(12, root.width * 0.032)
                 elide: Text.ElideRight
             }

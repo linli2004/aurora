@@ -11,8 +11,8 @@ Item {
     property int musicReturnPage: 0
     property rect transitionStartRect: Qt.rect(0, 0, 0, 0)
     property rect transitionEndRect: Qt.rect(0, 0, 0, 0)
-    property string transitionTitle: "Quiet Signals"
-    property string transitionArtist: "Aurora Demo"
+    property string transitionTitle: AuroraI18n.text("demo.track")
+    property string transitionArtist: AuroraI18n.text("demo.artist")
     property url transitionArtworkSource:
         "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
     property color transitionIdentityColor: AuroraTokens.coolAccent
@@ -20,8 +20,12 @@ Item {
     readonly property bool identityTransitionRunning: identityTransition.visible
 
     function prepareCurrentIdentity() {
-        transitionTitle = AudioRuntime.hasTrack ? AudioRuntime.title : "Quiet Signals"
-        transitionArtist = AudioRuntime.hasTrack ? AudioRuntime.artist : "Aurora Demo"
+        transitionTitle = AudioRuntime.hasTrack
+                ? AudioRuntime.title
+                : AuroraI18n.text("demo.track")
+        transitionArtist = AudioRuntime.hasTrack
+                ? AudioRuntime.artist
+                : AuroraI18n.text("demo.artist")
         transitionArtworkSource = AudioRuntime.hasTrack
                 ? AudioRuntime.artworkSource
                 : "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
@@ -216,5 +220,22 @@ Item {
         artist: root.transitionArtist
         artworkSource: root.transitionArtworkSource
         colorSignature: root.transitionIdentityColor
+    }
+
+    MangaLanguageToggle {
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 28
+        anchors.bottomMargin: 26
+        z: 500
+        visible: root.currentPage !== 2
+        opacity: root.identityTransitionRunning ? 0.0 : 1.0
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: AuroraTokens.motionSoft
+                easing.type: Easing.OutCubic
+            }
+        }
     }
 }

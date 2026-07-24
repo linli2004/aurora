@@ -17,8 +17,10 @@ Item {
     property bool controlMode: false
     property bool momentFeedbackVisible: false
 
-    readonly property string displayTitle: AudioRuntime.hasTrack ? AudioRuntime.title : "Quiet Signals"
-    readonly property string displayArtist: AudioRuntime.hasTrack ? AudioRuntime.artist : "Aurora Demo"
+    readonly property string displayTitle:
+        AudioRuntime.hasTrack ? AudioRuntime.title : AuroraI18n.text("demo.track")
+    readonly property string displayArtist:
+        AudioRuntime.hasTrack ? AudioRuntime.artist : AuroraI18n.text("demo.artist")
     readonly property string displayArtistLine:
         root.displayArtist === "Local audio" ? "" : root.displayArtist
     readonly property string displayAlbum: AudioRuntime.hasTrack ? AudioRuntime.album : ""
@@ -29,19 +31,29 @@ Item {
     readonly property real progressRatio:
         AudioRuntime.duration > 0 ? Math.min(1, AudioRuntime.position / AudioRuntime.duration) : 0
     readonly property bool libraryBrowserAvailable: LocalLibrary.sourceCount > 0 || LocalLibrary.searchText.length > 0
-    readonly property bool forceControlsVisible:
-        !AudioRuntime.hasTrack && LocalLibrary.trackCount === 0
+    readonly property bool forceControlsVisible: false
     readonly property bool controlsVisible:
         root.forceControlsVisible
         || root.controlMode
         || root.libraryMenuExpanded
         || root.tracksPanelExpanded
     readonly property real controlOpacity: root.controlsVisible ? 1.0 : 0.0
-    readonly property string firstRunLibraryMessage: LocalLibrary.defaultMusicDirectoryAvailable ? "First run · scan Music folder" : "First run · choose a music folder"
+    readonly property bool emptyMusicPromptVisible:
+        !AudioRuntime.hasTrack
+        && LocalLibrary.trackCount === 0
+        && !root.controlsVisible
+    readonly property string firstRunLibraryMessage:
+        LocalLibrary.defaultMusicDirectoryAvailable
+        ? AuroraI18n.text("music.firstRunMusic")
+        : AuroraI18n.text("music.firstRunChoose")
     readonly property bool currentMomentKeepable:
         AudioRuntime.hasTrack
         && AudioRuntime.trackId.length > 0
         && AudioRuntime.filePath.length > 0
+    readonly property color mangaButtonFill: AuroraTokens.mangaPanel
+    readonly property color mangaButtonBorder: AuroraTokens.mangaInk
+    readonly property color mangaText: AuroraTokens.mangaInk
+    readonly property color mangaMutedText: AuroraTokens.mangaMuted
 
     signal closeRequested()
 
@@ -192,7 +204,7 @@ Item {
 
     FileDialog {
         id: audioDialog
-        title: "Choose local music"
+        title: AuroraI18n.text("music.audioDialog")
         fileMode: FileDialog.OpenFiles
         nameFilters: [
             "Audio files (*.mp3 *.flac *.ogg *.opus *.wav *.m4a *.aac)",
@@ -203,7 +215,7 @@ Item {
 
     FolderDialog {
         id: libraryDialog
-        title: "Choose music folder"
+        title: AuroraI18n.text("music.folderDialog")
         onAccepted: LocalLibrary.scanDirectory(selectedFolder)
     }
 
@@ -213,6 +225,17 @@ Item {
         acceptedButtons: Qt.NoButton
         z: 10
         onPositionChanged: root.revealControls()
+    }
+
+    MangaBackdrop {
+        anchors.fill: parent
+        accentColor: root.displayIdentityColor
+        secondaryColor: AuroraTokens.memoryAccent
+        energy: (AudioRuntime.playing ? 0.36 : AudioRuntime.hasTrack ? 0.22 : 0.15)
+                + AudioRuntime.audioLevel * 0.46
+                + AudioRuntime.transientEnergy * 0.18
+        accessibilityMode: root.accessibilityMode
+        qualityMode: root.qualityMode
     }
 
     AtmosphereField {
@@ -228,7 +251,8 @@ Item {
         midEnergy: AudioRuntime.midEnergy
         highEnergy: AudioRuntime.highEnergy
         transientEnergy: AudioRuntime.transientEnergy
-        opacity: root.flowSceneEnabled ? 0.0 : 1.0
+        paperMode: true
+        opacity: root.flowSceneEnabled ? 0.0 : 0.24
 
         Behavior on opacity {
             NumberAnimation {
@@ -253,7 +277,8 @@ Item {
         midEnergy: AudioRuntime.midEnergy
         highEnergy: AudioRuntime.highEnergy
         transientEnergy: AudioRuntime.transientEnergy
-        opacity: root.flowSceneEnabled ? 1.0 : 0.0
+        paperMode: true
+        opacity: root.flowSceneEnabled ? 0.28 : 0.0
 
         Behavior on opacity {
             NumberAnimation {
@@ -270,7 +295,7 @@ Item {
         anchors.verticalCenterOffset: -34
         width: Math.min(root.width * 0.58, root.height * 0.78)
         height: width * 0.86
-        opacity: AudioRuntime.hasTrack ? 0.62 : 0.36
+        opacity: AudioRuntime.hasTrack ? 0.42 : 0.24
         scale: 1.0 + AudioRuntime.bassEnergy * 0.035 + AudioRuntime.transientEnergy * 0.020
 
         Rectangle {
@@ -279,7 +304,12 @@ Item {
             color: Qt.rgba(root.displayIdentityColor.r,
                            root.displayIdentityColor.g,
                            root.displayIdentityColor.b,
-                           0.040 + AudioRuntime.audioLevel * 0.030)
+                           0.014 + AudioRuntime.audioLevel * 0.018)
+            border.width: 3
+            border.color: Qt.rgba(AuroraTokens.mangaInk.r,
+                                  AuroraTokens.mangaInk.g,
+                                  AuroraTokens.mangaInk.b,
+                                  0.06 + AudioRuntime.highEnergy * 0.06)
             rotation: -8 + AudioRuntime.midEnergy * 3
         }
 
@@ -291,12 +321,47 @@ Item {
             color: Qt.rgba(AuroraTokens.memoryAccent.r,
                            AuroraTokens.memoryAccent.g,
                            AuroraTokens.memoryAccent.b,
-                           0.030 + AudioRuntime.highEnergy * 0.034)
+                           0.012 + AudioRuntime.highEnergy * 0.022)
+            border.width: 2
+            border.color: Qt.rgba(AuroraTokens.mangaInk.r,
+                                  AuroraTokens.mangaInk.g,
+                                  AuroraTokens.mangaInk.b,
+                                  0.05 + AudioRuntime.transientEnergy * 0.07)
             rotation: 11 - AudioRuntime.highEnergy * 4
         }
 
         Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
         Behavior on opacity { NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
+    }
+
+    Rectangle {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Math.max(86, parent.height * 0.11)
+        width: 178
+        height: 46
+        visible: root.emptyMusicPromptVisible
+        opacity: root.emptyMusicPromptVisible ? 1.0 : 0.0
+        radius: 9
+        color: AuroraTokens.mangaPanel
+        border.width: 3
+        border.color: AuroraTokens.mangaInk
+        rotation: 1.0
+        z: 9
+
+        Text {
+            anchors.centerIn: parent
+            text: AuroraI18n.text("music.chooseMusic")
+            color: AuroraTokens.mangaInk
+            font.pixelSize: 14
+            font.weight: Font.DemiBold
+        }
+
+        TapHandler { onTapped: audioDialog.open() }
+
+        Behavior on opacity {
+            NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
+        }
     }
 
     Rectangle {
@@ -308,16 +373,17 @@ Item {
         enabled: root.controlsVisible
         opacity: root.controlOpacity
         scale: 0.965 + root.controlOpacity * 0.035
-        radius: 21
-        color: Qt.rgba(1, 1, 1, 0.07)
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.10)
+        radius: 8
+        color: root.mangaButtonFill
+        border.width: 2
+        border.color: root.mangaButtonBorder
 
         Text {
             anchors.centerIn: parent
-            text: "Back"
-            color: AuroraTokens.textSecondary
+            text: AuroraI18n.text("music.back")
+            color: root.mangaText
             font.pixelSize: 14
+            font.weight: Font.DemiBold
         }
 
         TapHandler { onTapped: root.closeRequested() }
@@ -336,24 +402,21 @@ Item {
         enabled: root.controlsVisible
         opacity: root.controlOpacity
         scale: 0.965 + root.controlOpacity * 0.035
-        radius: 21
-        color: root.flowSceneEnabled
-               ? Qt.rgba(root.displayIdentityColor.r,
-                         root.displayIdentityColor.g,
-                         root.displayIdentityColor.b, 0.18)
-               : Qt.rgba(1, 1, 1, 0.07)
-        border.width: 1
+        radius: 8
+        color: root.mangaButtonFill
+        border.width: 2
         border.color: root.flowSceneEnabled
-                      ? Qt.rgba(root.displayIdentityColor.r,
-                                root.displayIdentityColor.g,
-                                root.displayIdentityColor.b, 0.42)
-                      : Qt.rgba(1, 1, 1, 0.10)
+                      ? root.displayIdentityColor
+                      : root.mangaButtonBorder
 
         Text {
             anchors.centerIn: parent
-            text: root.flowSceneEnabled ? "Scene: Flow" : "Scene: Field"
-            color: AuroraTokens.textSecondary
+            text: root.flowSceneEnabled
+                  ? AuroraI18n.text("music.sceneFlow")
+                  : AuroraI18n.text("music.sceneField")
+            color: root.mangaText
             font.pixelSize: 12
+            font.weight: Font.DemiBold
         }
 
         TapHandler { onTapped: root.flowSceneEnabled = !root.flowSceneEnabled }
@@ -372,28 +435,30 @@ Item {
         enabled: root.controlsVisible
         opacity: root.controlOpacity
         scale: 0.965 + root.controlOpacity * 0.035
-        radius: 21
+        radius: 8
         color: root.currentMomentKeepable
                ? Qt.rgba(root.displayIdentityColor.r,
                          root.displayIdentityColor.g,
-                         root.displayIdentityColor.b, 0.16)
-               : Qt.rgba(1, 1, 1, 0.045)
-        border.width: 1
+                         root.displayIdentityColor.b, 0.18)
+               : AuroraTokens.mangaWash
+        border.width: 2
         border.color: root.currentMomentKeepable
-                      ? Qt.rgba(root.displayIdentityColor.r,
-                                root.displayIdentityColor.g,
-                                root.displayIdentityColor.b, 0.36)
-                      : Qt.rgba(1, 1, 1, 0.08)
+                      ? root.displayIdentityColor
+                      : Qt.rgba(AuroraTokens.mangaInk.r,
+                                AuroraTokens.mangaInk.g,
+                                AuroraTokens.mangaInk.b,
+                                0.38)
 
         Text {
             anchors.centerIn: parent
             text: Moments.latestTrackId === AudioRuntime.trackId
-                  ? "Keep again"
-                  : "Keep moment"
+                  ? AuroraI18n.text("music.keepAgain")
+                  : AuroraI18n.text("music.keepMoment")
             color: root.currentMomentKeepable
-                   ? AuroraTokens.textSecondary
-                   : AuroraTokens.textMuted
+                   ? root.mangaText
+                   : root.mangaMutedText
             font.pixelSize: 12
+            font.weight: Font.DemiBold
         }
 
         TapHandler {
@@ -417,7 +482,7 @@ Item {
               : Moments.lastStatus
         color: Moments.errorString.length > 0
                ? AuroraTokens.warmAccent
-               : AuroraTokens.textMuted
+               : root.mangaMutedText
         font.pixelSize: 10
         elide: Text.ElideRight
         visible: text.length > 0 || root.momentFeedbackVisible
@@ -481,16 +546,19 @@ Item {
         enabled: root.controlsVisible
         opacity: root.controlOpacity
         scale: 0.965 + root.controlOpacity * 0.035
-        radius: 21
-        color: Qt.rgba(1, 1, 1, 0.07)
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.10)
+        radius: 8
+        color: root.mangaButtonFill
+        border.width: 2
+        border.color: root.mangaButtonBorder
 
         Text {
             anchors.centerIn: parent
-            text: AudioRuntime.hasTrack ? "Change music" : "Choose music"
-            color: AuroraTokens.textSecondary
+            text: AudioRuntime.hasTrack
+                  ? AuroraI18n.text("music.changeMusic")
+                  : AuroraI18n.text("music.chooseMusic")
+            color: root.mangaText
             font.pixelSize: 13
+            font.weight: Font.DemiBold
         }
 
         TapHandler { onTapped: audioDialog.open() }
@@ -519,26 +587,25 @@ Item {
             id: libraryMenuButton
             width: 150
             height: 42
-            radius: 21
+            radius: 8
             color: root.libraryMenuExpanded
                    ? Qt.rgba(root.displayIdentityColor.r,
                              root.displayIdentityColor.g,
-                             root.displayIdentityColor.b, 0.18)
-                   : Qt.rgba(1, 1, 1, 0.07)
-            border.width: 1
+                             root.displayIdentityColor.b, 0.20)
+                   : root.mangaButtonFill
+            border.width: 2
             border.color: root.libraryMenuExpanded
-                          ? Qt.rgba(root.displayIdentityColor.r,
-                                    root.displayIdentityColor.g,
-                                    root.displayIdentityColor.b, 0.42)
-                          : Qt.rgba(1, 1, 1, 0.10)
+                          ? root.displayIdentityColor
+                          : root.mangaButtonBorder
 
             Text {
                 anchors.centerIn: parent
                 text: LocalLibrary.scanning
-                      ? "Scanning · " + LocalLibrary.scannedFileCount
-                      : "Library · " + LocalLibrary.trackCount
-                color: AuroraTokens.textSecondary
+                      ? AuroraI18n.text("music.scanning") + " · " + LocalLibrary.scannedFileCount
+                      : AuroraI18n.text("music.library") + " · " + LocalLibrary.trackCount
+                color: root.mangaText
                 font.pixelSize: 13
+                font.weight: Font.DemiBold
                 elide: Text.ElideRight
             }
 
@@ -556,9 +623,9 @@ Item {
             visible: root.libraryMenuExpanded
             opacity: root.libraryMenuExpanded ? 1 : 0
             radius: 8
-            color: Qt.rgba(0.04, 0.05, 0.07, 0.74)
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.10)
+            color: AuroraTokens.mangaPanel
+            border.width: 2
+            border.color: AuroraTokens.mangaInk
 
             Column {
                 anchors.fill: parent
@@ -570,14 +637,16 @@ Item {
                     text: LocalLibrary.lastScanStatus.length > 0
                           ? LocalLibrary.lastScanStatus
                             + (LocalLibrary.scanning
-                               ? " · " + LocalLibrary.scannedFileCount + " files"
+                               ? " · " + LocalLibrary.scannedFileCount
+                                 + " " + AuroraI18n.text("music.files")
                                : "")
                           : (LocalLibrary.firstRun
                              ? root.firstRunLibraryMessage
-                             : LocalLibrary.trackCount + " tracks ready")
+                             : LocalLibrary.trackCount
+                               + " " + AuroraI18n.text("music.ready"))
                     color: LocalLibrary.errorString.length > 0
                            ? AuroraTokens.warmAccent
-                           : AuroraTokens.textMuted
+                           : root.mangaMutedText
                     font.pixelSize: 11
                     elide: Text.ElideRight
                 }
@@ -590,21 +659,22 @@ Item {
                         height: 30
                         radius: 15
                         color: LocalLibrary.scanning
-                               ? Qt.rgba(1, 1, 1, 0.045)
-                               : Qt.rgba(1, 1, 1, 0.08)
-                        border.width: 1
-                        border.color: Qt.rgba(1, 1, 1, 0.10)
+                               ? AuroraTokens.mangaWash
+                               : AuroraTokens.mangaPaper
+                        border.width: 2
+                        border.color: AuroraTokens.mangaInk
 
                         Text {
                             anchors.centerIn: parent
                             text: LocalLibrary.scanning
-                                  ? "Cancel scan"
+                                  ? AuroraI18n.text("music.cancelScan")
                                   : (LocalLibrary.firstRun
                                      && LocalLibrary.defaultMusicDirectoryAvailable
-                                     ? "Scan Music"
-                                     : "Add folder")
-                            color: AuroraTokens.textSecondary
+                                     ? AuroraI18n.text("music.scanMusic")
+                                     : AuroraI18n.text("music.addFolder"))
+                            color: root.mangaText
                             font.pixelSize: 11
+                            font.weight: Font.DemiBold
                         }
 
                         TapHandler {
@@ -627,18 +697,19 @@ Item {
                         color: LocalLibrary.sourceCount > 0
                                ? Qt.rgba(root.displayIdentityColor.r,
                                          root.displayIdentityColor.g,
-                                         root.displayIdentityColor.b, 0.16)
-                               : Qt.rgba(1, 1, 1, 0.045)
-                        border.width: 1
-                        border.color: Qt.rgba(1, 1, 1, 0.10)
+                                         root.displayIdentityColor.b, 0.18)
+                               : AuroraTokens.mangaWash
+                        border.width: 2
+                        border.color: AuroraTokens.mangaInk
 
                         Text {
                             anchors.centerIn: parent
                             text: LocalLibrary.sourceCount > 0
-                                  ? "Play library"
-                                  : "Choose folder"
-                            color: AuroraTokens.textSecondary
+                                  ? AuroraI18n.text("music.playLibrary")
+                                  : AuroraI18n.text("music.chooseFolder")
+                            color: root.mangaText
                             font.pixelSize: 11
+                            font.weight: Font.DemiBold
                         }
 
                         TapHandler {
@@ -666,7 +737,7 @@ Item {
                         text: LocalLibrary.libraryRootsSummary
                         color: LocalLibrary.unavailableRootCount > 0
                                ? AuroraTokens.warmAccent
-                               : AuroraTokens.textMuted
+                               : root.mangaMutedText
                         font.pixelSize: 10
                         elide: Text.ElideMiddle
                     }
@@ -676,18 +747,19 @@ Item {
                         height: 30
                         radius: 15
                         color: LocalLibrary.scanning
-                               ? Qt.rgba(1, 1, 1, 0.045)
+                               ? AuroraTokens.mangaWash
                                : Qt.rgba(root.displayIdentityColor.r,
                                          root.displayIdentityColor.g,
-                                         root.displayIdentityColor.b, 0.14)
-                        border.width: 1
-                        border.color: Qt.rgba(1, 1, 1, 0.10)
+                                         root.displayIdentityColor.b, 0.16)
+                        border.width: 2
+                        border.color: AuroraTokens.mangaInk
 
                         Text {
                             anchors.centerIn: parent
-                            text: "Rescan all"
-                            color: AuroraTokens.textSecondary
+                            text: AuroraI18n.text("music.rescanAll")
+                            color: root.mangaText
                             font.pixelSize: 10
+                            font.weight: Font.DemiBold
                         }
 
                         TapHandler {
@@ -721,26 +793,25 @@ Item {
             anchors.bottom: parent.bottom
             width: 132
             height: 42
-            radius: 21
+            radius: 8
             color: root.tracksPanelExpanded
                    ? Qt.rgba(root.displayIdentityColor.r,
                              root.displayIdentityColor.g,
-                             root.displayIdentityColor.b, 0.18)
-                   : Qt.rgba(1, 1, 1, 0.07)
-            border.width: 1
+                             root.displayIdentityColor.b, 0.20)
+                   : root.mangaButtonFill
+            border.width: 2
             border.color: root.tracksPanelExpanded
-                          ? Qt.rgba(root.displayIdentityColor.r,
-                                    root.displayIdentityColor.g,
-                                    root.displayIdentityColor.b, 0.42)
-                          : Qt.rgba(1, 1, 1, 0.10)
+                          ? root.displayIdentityColor
+                          : root.mangaButtonBorder
 
             Text {
                 anchors.centerIn: parent
                 text: root.libraryBrowserAvailable
-                      ? "Tracks · " + LocalLibrary.visibleTrackCount
-                      : "Tracks"
-                color: AuroraTokens.textSecondary
+                      ? AuroraI18n.text("music.tracks") + " · " + LocalLibrary.visibleTrackCount
+                      : AuroraI18n.text("music.tracks")
+                color: root.mangaText
                 font.pixelSize: 13
+                font.weight: Font.DemiBold
             }
 
             TapHandler {
@@ -756,9 +827,9 @@ Item {
             height: parent.height - tracksButton.height - 10
             visible: root.tracksPanelExpanded
             radius: 8
-            color: Qt.rgba(0.04, 0.05, 0.07, 0.74)
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.10)
+            color: AuroraTokens.mangaPanel
+            border.width: 2
+            border.color: AuroraTokens.mangaInk
 
             Column {
                 anchors.fill: parent
@@ -773,8 +844,8 @@ Item {
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         width: parent.width - 96
-                        text: "Tracks"
-                        color: AuroraTokens.textSecondary
+                        text: AuroraI18n.text("music.tracks")
+                        color: root.mangaText
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
                         elide: Text.ElideRight
@@ -788,15 +859,16 @@ Item {
                                ? Qt.rgba(root.displayIdentityColor.r,
                                          root.displayIdentityColor.g,
                                          root.displayIdentityColor.b, 0.18)
-                               : Qt.rgba(1, 1, 1, 0.045)
-                        border.width: 1
-                        border.color: Qt.rgba(1, 1, 1, 0.10)
+                               : AuroraTokens.mangaWash
+                        border.width: 2
+                        border.color: AuroraTokens.mangaInk
 
                         Text {
                             anchors.centerIn: parent
-                            text: "Play list"
-                            color: AuroraTokens.textSecondary
+                            text: AuroraI18n.text("music.playList")
+                            color: root.mangaText
                             font.pixelSize: 11
+                            font.weight: Font.DemiBold
                         }
 
                         TapHandler {
@@ -810,13 +882,11 @@ Item {
                     width: parent.width
                     height: 34
                     radius: 8
-                    color: Qt.rgba(1, 1, 1, 0.055)
-                    border.width: 1
+                    color: AuroraTokens.mangaPaper
+                    border.width: 2
                     border.color: searchInput.activeFocus
-                                  ? Qt.rgba(root.displayIdentityColor.r,
-                                            root.displayIdentityColor.g,
-                                            root.displayIdentityColor.b, 0.42)
-                                  : Qt.rgba(1, 1, 1, 0.10)
+                                  ? root.displayIdentityColor
+                                  : AuroraTokens.mangaInk
 
                     TextInput {
                         id: searchInput
@@ -825,19 +895,19 @@ Item {
                         anchors.rightMargin: 12
                         verticalAlignment: TextInput.AlignVCenter
                         text: LocalLibrary.searchText
-                        color: AuroraTokens.textPrimary
+                        color: root.mangaText
                         selectionColor: Qt.rgba(root.displayIdentityColor.r,
                                                 root.displayIdentityColor.g,
                                                 root.displayIdentityColor.b, 0.42)
-                        selectedTextColor: AuroraTokens.textPrimary
+                        selectedTextColor: AuroraTokens.mangaInk
                         font.pixelSize: 12
                         clip: true
                         onTextEdited: LocalLibrary.searchText = text
 
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "Search library"
-                            color: AuroraTokens.textMuted
+                            text: AuroraI18n.text("music.searchLibrary")
+                            color: root.mangaMutedText
                             font.pixelSize: 12
                             visible: searchInput.text.length === 0 && !searchInput.activeFocus
                         }
@@ -866,14 +936,18 @@ Item {
                         color: AudioRuntime.filePath === filePath
                                ? Qt.rgba(root.displayIdentityColor.r,
                                          root.displayIdentityColor.g,
-                                         root.displayIdentityColor.b, 0.18)
-                               : Qt.rgba(1, 1, 1, 0.045)
-                        border.width: 1
+                                         root.displayIdentityColor.b, 0.16)
+                               : Qt.rgba(AuroraTokens.mangaInk.r,
+                                         AuroraTokens.mangaInk.g,
+                                         AuroraTokens.mangaInk.b,
+                                         0.045)
+                        border.width: 2
                         border.color: AudioRuntime.filePath === filePath
-                                      ? Qt.rgba(root.displayIdentityColor.r,
-                                                root.displayIdentityColor.g,
-                                                root.displayIdentityColor.b, 0.42)
-                                      : Qt.rgba(1, 1, 1, 0.08)
+                                      ? root.displayIdentityColor
+                                      : Qt.rgba(AuroraTokens.mangaInk.r,
+                                                AuroraTokens.mangaInk.g,
+                                                AuroraTokens.mangaInk.b,
+                                                0.20)
 
                         Column {
                             anchors.left: parent.left
@@ -886,7 +960,7 @@ Item {
                             Text {
                                 width: parent.width
                                 text: title.length > 0 ? title : fileName
-                                color: AuroraTokens.textSecondary
+                                color: root.mangaText
                                 font.pixelSize: 12
                                 elide: Text.ElideRight
                             }
@@ -896,7 +970,7 @@ Item {
                                 text: artist.length > 0
                                       ? artist + (album.length > 0 ? " · " + album : "")
                                       : fileName
-                                color: AuroraTokens.textMuted
+                                color: root.mangaMutedText
                                 font.pixelSize: 10
                                 elide: Text.ElideRight
                             }
@@ -915,8 +989,12 @@ Item {
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
                         visible: libraryList.count === 0
-                        text: LocalLibrary.searchText.length > 0 ? "No matching tracks" : (LocalLibrary.firstRun ? "Scan your Music folder to begin" : "No tracks")
-                            color: AuroraTokens.textMuted
+                        text: LocalLibrary.searchText.length > 0
+                              ? AuroraI18n.text("music.noMatches")
+                              : (LocalLibrary.firstRun
+                                 ? AuroraI18n.text("music.scanToBegin")
+                                 : AuroraI18n.text("music.noTracks"))
+                            color: root.mangaMutedText
                         font.pixelSize: 12
                         wrapMode: Text.Wrap
                     }
@@ -989,6 +1067,7 @@ Item {
             accessibilityMode: root.accessibilityMode
             qualityMode: root.qualityMode
             heroMode: true
+            mangaMode: true
             audioReactiveAvailable: AudioRuntime.audioReactiveAvailable
             audioLevel: AudioRuntime.audioLevel
             bassEnergy: AudioRuntime.bassEnergy
@@ -1016,8 +1095,9 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 text: root.displayTitle
-                color: AuroraTokens.textPrimary
-                font.pixelSize: 28
+                color: root.mangaText
+                opacity: root.controlsVisible ? 1.0 : 0.76
+                font.pixelSize: root.controlsVisible ? 28 : 23
                 font.weight: Font.DemiBold
             }
 
@@ -1036,7 +1116,7 @@ Item {
                          : root.controlsVisible && AudioRuntime.queueCount > 0
                            ? (AudioRuntime.currentIndex + 1) + "/" + AudioRuntime.queueCount
                          : "")
-                color: AuroraTokens.textSecondary
+                color: root.mangaMutedText
                 opacity: root.controlsVisible ? 1.0 : 0.62
                 font.pixelSize: 14
             }
@@ -1048,7 +1128,7 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 text: AudioRuntime.identityProvenance
-                color: AuroraTokens.textMuted
+                color: root.mangaMutedText
                 font.pixelSize: 11
             }
 
@@ -1072,7 +1152,7 @@ Item {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.formatTime(AudioRuntime.position)
-                color: AuroraTokens.textMuted
+                color: root.mangaMutedText
                 font.pixelSize: 12
                 opacity: root.controlOpacity
             }
@@ -1086,16 +1166,17 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 height: 5
                 radius: 3
-                opacity: AudioRuntime.hasTrack
-                         ? 0.24 + root.controlOpacity * 0.76
-                         : root.controlOpacity
-                color: Qt.rgba(1, 1, 1, root.controlsVisible ? 0.11 : 0.055)
+                opacity: root.controlOpacity
+                color: Qt.rgba(AuroraTokens.mangaInk.r,
+                               AuroraTokens.mangaInk.g,
+                               AuroraTokens.mangaInk.b,
+                               root.controlsVisible ? 0.16 : 0.070)
 
                 Rectangle {
                     width: parent.width * root.progressRatio
                     height: parent.height
                     radius: parent.radius
-                    color: AuroraTokens.memoryAccent
+                    color: root.displayIdentityColor
                 }
 
                 TapHandler {
@@ -1113,7 +1194,7 @@ Item {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.formatTime(AudioRuntime.duration)
-                color: AuroraTokens.textMuted
+                color: root.mangaMutedText
                 font.pixelSize: 12
                 opacity: root.controlOpacity
             }
@@ -1129,16 +1210,17 @@ Item {
                 enabled: root.controlsVisible
                 opacity: root.controlOpacity
                 scale: 0.965 + root.controlOpacity * 0.035
-                radius: 21
-                color: Qt.rgba(1, 1, 1, 0.07)
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.10)
+                radius: 8
+                color: root.mangaButtonFill
+                border.width: 2
+                border.color: root.mangaButtonBorder
 
                 Text {
                     anchors.centerIn: parent
-                    text: "Previous"
-                    color: AuroraTokens.textSecondary
+                    text: AuroraI18n.text("music.previous")
+                    color: root.mangaText
                     font.pixelSize: 12
+                    font.weight: Font.DemiBold
                 }
 
                 TapHandler {
@@ -1176,16 +1258,17 @@ Item {
                 enabled: root.controlsVisible
                 opacity: root.controlOpacity
                 scale: 0.965 + root.controlOpacity * 0.035
-                radius: 21
-                color: Qt.rgba(1, 1, 1, 0.07)
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.10)
+                radius: 8
+                color: root.mangaButtonFill
+                border.width: 2
+                border.color: root.mangaButtonBorder
 
                 Text {
                     anchors.centerIn: parent
-                    text: "Next"
-                    color: AuroraTokens.textSecondary
+                    text: AuroraI18n.text("music.next")
+                    color: root.mangaText
                     font.pixelSize: 12
+                    font.weight: Font.DemiBold
                 }
 
                 TapHandler {
@@ -1210,8 +1293,8 @@ Item {
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Volume"
-                color: AuroraTokens.textMuted
+                text: AuroraI18n.text("music.volume")
+                color: root.mangaMutedText
                 font.pixelSize: 12
             }
 
@@ -1220,13 +1303,16 @@ Item {
                 width: 140
                 height: 5
                 radius: 3
-                color: Qt.rgba(1, 1, 1, 0.11)
+                color: Qt.rgba(AuroraTokens.mangaInk.r,
+                               AuroraTokens.mangaInk.g,
+                               AuroraTokens.mangaInk.b,
+                               0.16)
 
                 Rectangle {
                     width: parent.width * AudioRuntime.volume
                     height: parent.height
                     radius: parent.radius
-                    color: AuroraTokens.coolAccent
+                    color: root.displayIdentityColor
                 }
 
                 TapHandler {
@@ -1241,7 +1327,7 @@ Item {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: Math.round(AudioRuntime.volume * 100) + "%"
-                color: AuroraTokens.textMuted
+                color: root.mangaMutedText
                 font.pixelSize: 12
             }
         }

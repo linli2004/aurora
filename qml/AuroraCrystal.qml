@@ -14,6 +14,7 @@ FocusScope {
     property int qualityMode: AuroraTypes.Balanced
     property real crystalSize: 180
     property bool heroMode: false
+    property bool mangaMode: false
 
     property bool audioReactiveAvailable: false
     property real audioLevel: 0.0
@@ -102,7 +103,8 @@ FocusScope {
         color: Qt.rgba(root.colorSignature.r,
                        root.colorSignature.g,
                        root.colorSignature.b,
-                       0.055 + root.level * 0.045)
+                       root.mangaMode ? 0.030 + root.level * 0.035
+                                      : 0.055 + root.level * 0.045)
         scale: 1.0 + root.transientLevel * 0.035
         rotation: root.motionEnabled ? Math.sin(root.ambientPhase * 0.32) * 2.6 : 0
     }
@@ -112,15 +114,24 @@ FocusScope {
         anchors.fill: parent
         radius: width * (root.heroMode ? 0.22 : 0.10)
         opacity: root.heroMode ? 0.92 : 1.0
-        color: root.heroMode
+        color: root.mangaMode
+               ? Qt.rgba(root.colorSignature.r,
+                         root.colorSignature.g,
+                         root.colorSignature.b,
+                         root.heroMode ? 0.18 : 0.24)
+               : root.heroMode
                ? Qt.rgba(root.colorSignature.r,
                          root.colorSignature.g,
                          root.colorSignature.b,
                          0.26)
                : Qt.darker(root.colorSignature, 1.5)
-        border.width: root.activeFocus ? 3 : (root.heroMode ? 0 : root.transitioning ? 2 : 1)
+        border.width: root.mangaMode
+                      ? (root.activeFocus ? 4 : 3)
+                      : root.activeFocus ? 3 : (root.heroMode ? 0 : root.transitioning ? 2 : 1)
         border.color: root.activeFocus
                       ? AuroraTokens.focusRing
+                      : root.mangaMode
+                        ? AuroraTokens.mangaInk
                       : root.transitioning
                         ? Qt.rgba(root.colorSignature.r,
                                   root.colorSignature.g,
@@ -143,19 +154,48 @@ FocusScope {
             gradient: Gradient {
                 GradientStop {
                     position: 0.0
-                    color: Qt.rgba(root.colorSignature.r,
-                                   root.colorSignature.g,
-                                   root.colorSignature.b,
-                                   0.18 + root.mid * 0.08)
+                    color: root.mangaMode
+                           ? Qt.rgba(root.colorSignature.r,
+                                     root.colorSignature.g,
+                                     root.colorSignature.b,
+                                     0.10 + root.mid * 0.05)
+                           : Qt.rgba(root.colorSignature.r,
+                                     root.colorSignature.g,
+                                     root.colorSignature.b,
+                                     0.18 + root.mid * 0.08)
                 }
                 GradientStop {
                     position: 0.52
-                    color: Qt.rgba(0, 0, 0, 0.02)
+                    color: root.mangaMode
+                           ? Qt.rgba(1, 1, 1, 0.10)
+                           : Qt.rgba(0, 0, 0, 0.02)
                 }
                 GradientStop {
                     position: 1.0
-                    color: Qt.rgba(0, 0, 0, 0.22)
+                    color: root.mangaMode
+                           ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                     AuroraTokens.mangaInk.g,
+                                     AuroraTokens.mangaInk.b,
+                                     0.16)
+                           : Qt.rgba(0, 0, 0, 0.22)
                 }
+            }
+        }
+
+        Repeater {
+            model: root.heroMode && root.mangaMode ? 12 : 0
+
+            delegate: Rectangle {
+                required property int index
+
+                width: parent.width * (0.30 + index * 0.032)
+                height: 2
+                radius: 1
+                x: parent.width * (0.02 + index * 0.030)
+                y: parent.height * (0.12 + index * 0.060)
+                rotation: -20
+                color: AuroraTokens.mangaInk
+                opacity: 0.045 + root.high * 0.060
             }
         }
 
@@ -197,9 +237,19 @@ FocusScope {
                 width: parent.width * (root.heroMode ? 0.68 : 0.56)
                 height: root.heroMode ? parent.height * 0.18 : width
                 radius: height * 0.48
-                color: Qt.rgba(1, 1, 1, 0.055 + root.mid * 0.030)
+                color: root.mangaMode
+                       ? Qt.rgba(AuroraTokens.mangaPanel.r,
+                                 AuroraTokens.mangaPanel.g,
+                                 AuroraTokens.mangaPanel.b,
+                                 0.40 + root.mid * 0.08)
+                       : Qt.rgba(1, 1, 1, 0.055 + root.mid * 0.030)
                 border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.12 + root.high * 0.10)
+                border.color: root.mangaMode
+                              ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                        AuroraTokens.mangaInk.g,
+                                        AuroraTokens.mangaInk.b,
+                                        0.22 + root.high * 0.18)
+                              : Qt.rgba(1, 1, 1, 0.12 + root.high * 0.10)
                 rotation: root.heroMode ? -16 : 12
             }
 
@@ -209,7 +259,12 @@ FocusScope {
                 width: parent.width * 0.48
                 height: parent.height * 0.13
                 radius: height * 0.48
-                color: Qt.rgba(1, 1, 1, 0.040 + root.high * 0.035)
+                color: root.mangaMode
+                       ? Qt.rgba(AuroraTokens.mangaPaper.r,
+                                 AuroraTokens.mangaPaper.g,
+                                 AuroraTokens.mangaPaper.b,
+                                 0.38 + root.high * 0.08)
+                       : Qt.rgba(1, 1, 1, 0.040 + root.high * 0.035)
                 rotation: 18
             }
 
@@ -217,7 +272,7 @@ FocusScope {
                 anchors.centerIn: parent
                 width: parent.width * 0.68
                 text: root.title.length > 0 ? root.title.charAt(0).toUpperCase() : "A"
-                color: AuroraTokens.textPrimary
+                color: root.mangaMode ? AuroraTokens.mangaInk : AuroraTokens.textPrimary
                 font.pixelSize: parent.width * 0.30
                 font.weight: Font.DemiBold
                 horizontalAlignment: Text.AlignHCenter
@@ -230,7 +285,12 @@ FocusScope {
             radius: parent.radius
             color: "transparent"
             border.width: root.qualityMode === AuroraTypes.Eco ? 0 : 2
-            border.color: Qt.rgba(1, 1, 1, 0.13 + root.high * 0.22)
+            border.color: root.mangaMode
+                          ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                    AuroraTokens.mangaInk.g,
+                                    AuroraTokens.mangaInk.b,
+                                    0.36 + root.high * 0.22)
+                          : Qt.rgba(1, 1, 1, 0.13 + root.high * 0.22)
             opacity: 0.72 + root.transientLevel * 0.18
         }
 
@@ -242,7 +302,12 @@ FocusScope {
             radius: parent.radius * 0.76
             color: "transparent"
             border.width: 1
-            border.color: Qt.rgba(1, 1, 1, root.qualityMode === AuroraTypes.Eco ? 0.10 : 0.16)
+            border.color: root.mangaMode
+                          ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                    AuroraTokens.mangaInk.g,
+                                    AuroraTokens.mangaInk.b,
+                                    root.qualityMode === AuroraTypes.Eco ? 0.10 : 0.22)
+                          : Qt.rgba(1, 1, 1, root.qualityMode === AuroraTypes.Eco ? 0.10 : 0.16)
         }
 
         Rectangle {
@@ -250,7 +315,12 @@ FocusScope {
             radius: parent.radius
             color: "transparent"
             border.width: root.qualityMode === AuroraTypes.Eco ? 0 : 2
-            border.color: Qt.rgba(1, 1, 1, 0.07)
+            border.color: root.mangaMode
+                          ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                    AuroraTokens.mangaInk.g,
+                                    AuroraTokens.mangaInk.b,
+                                    0.28)
+                          : Qt.rgba(1, 1, 1, 0.07)
         }
 
         Rectangle {

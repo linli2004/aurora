@@ -9,8 +9,10 @@ Window {
     minimumWidth: 920
     minimumHeight: 640
     visible: true
-    color: AuroraTokens.windowBackground
-    title: "Aurora Music Framework — Prototype 0.5.3"
+    color: AuroraTokens.mangaPaper
+    title: AuroraI18n.traditionalChinese
+           ? "Aurora 音樂記憶空間 · Demo"
+           : "Aurora Music Memory Space · Demo"
 
     AppShell { anchors.fill: parent }
 }

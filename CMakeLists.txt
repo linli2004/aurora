@@ -51,8 +51,11 @@ set(AURORA_QML_FILES
     qml/Main.qml
     qml/AppShell.qml
     qml/AuroraTokens.qml
+    qml/AuroraI18n.qml
     qml/AtmosphereField.qml
     qml/AuroraFlowScene.qml
+    qml/MangaBackdrop.qml
+    qml/MangaLanguageToggle.qml
     qml/LiquidTrackTransition.qml
     qml/AudioDiagnostics.qml
     qml/AuroraCore.qml
@@ -71,6 +74,10 @@ foreach(qml_file IN LISTS AURORA_QML_FILES)
 endforeach()
 
 set_source_files_properties(qml/AuroraTokens.qml
+    PROPERTIES QT_QML_SINGLETON_TYPE TRUE
+)
+
+set_source_files_properties(qml/AuroraI18n.qml
     PROPERTIES QT_QML_SINGLETON_TYPE TRUE
 )
 

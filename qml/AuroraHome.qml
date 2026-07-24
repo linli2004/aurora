@@ -8,6 +8,8 @@ Item {
     property int qualityMode: AuroraTypes.Balanced
     property bool identityVisible: true
     property bool transitioning: false
+    readonly property string homeArtistLine:
+        AudioRuntime.artist === "Local audio" ? "" : AudioRuntime.artist
 
     signal openMusicSpace()
     signal recallLatestMoment()
@@ -20,6 +22,18 @@ Item {
                                                currentMoment.height * 0.12)
         const size = currentMoment.width * 0.40
         return Qt.rect(origin.x, origin.y, size, size)
+    }
+
+    MangaBackdrop {
+        anchors.fill: parent
+        accentColor: Moments.hasMoment
+                     ? Moments.latestIdentityColor
+                     : AuroraTokens.coolAccent
+        secondaryColor: AuroraTokens.warmAccent
+        energy: AudioRuntime.audioLevel * 0.42
+                + (Moments.hasMoment ? 0.20 : 0.12)
+        accessibilityMode: root.accessibilityMode
+        qualityMode: root.qualityMode
     }
 
     AtmosphereField {
@@ -35,6 +49,8 @@ Item {
         midEnergy: AudioRuntime.midEnergy
         highEnergy: AudioRuntime.highEnergy
         transientEnergy: AudioRuntime.transientEnergy
+        paperMode: true
+        opacity: 0.16
     }
 
     Column {
@@ -46,7 +62,7 @@ Item {
 
         Text {
             text: "AURORA"
-            color: AuroraTokens.textSecondary
+            color: AuroraTokens.mangaInk
             font.pixelSize: 13
             font.letterSpacing: 4
             font.weight: Font.DemiBold
@@ -55,22 +71,35 @@ Item {
         Text {
             text: Moments.hasMoment
                   ? Moments.latestHeading
-                  : "Begin with a song."
-            color: AuroraTokens.textPrimary
+                  : AuroraI18n.text("home.begin")
+            color: AuroraTokens.mangaInk
             font.pixelSize: Math.max(34, root.width * 0.045)
             font.weight: Font.DemiBold
         }
 
-        Text {
+        Rectangle {
             width: Math.min(520, root.width * 0.42)
-            text: Moments.hasMoment
-                  ? (Moments.latestConfirmedMeaning.length > 0
-                     ? "\"" + Moments.latestConfirmedMeaning + "\""
-                     : Moments.latestTitle + " · " + Moments.latestArtist)
-                  : "Let one local track become the first remembered room."
-            color: AuroraTokens.textSecondary
-            font.pixelSize: 16
-            wrapMode: Text.Wrap
+            height: Math.max(54, homeNote.implicitHeight + 24)
+            radius: 8
+            color: AuroraTokens.mangaPanel
+            border.width: 2
+            border.color: AuroraTokens.mangaInk
+            rotation: -1.2
+
+            Text {
+                id: homeNote
+
+                anchors.fill: parent
+                anchors.margins: 12
+                text: Moments.hasMoment
+                      ? (Moments.latestConfirmedMeaning.length > 0
+                         ? "「" + Moments.latestConfirmedMeaning + "」"
+                         : Moments.latestTitle + " · " + Moments.latestArtist)
+                      : AuroraI18n.text("home.beginNote")
+                color: AuroraTokens.mangaMuted
+                font.pixelSize: 16
+                wrapMode: Text.Wrap
+            }
         }
     }
 
@@ -81,17 +110,23 @@ Item {
         title: Moments.hasMoment
                ? Moments.latestHeading
                : AudioRuntime.hasTrack
-                 ? "Current local session"
-                 : "The room after midnight"
+                 ? AuroraI18n.text("home.currentSession")
+                 : AuroraI18n.text("home.latestFallback")
         periodLabel: Moments.hasMoment
                      ? Moments.latestPeriodLabel
-                     : AudioRuntime.hasTrack ? "Now" : "Late Summer Night"
+                     : AudioRuntime.hasTrack
+                       ? AuroraI18n.text("home.now")
+                       : AuroraI18n.text("home.lateNight")
         trackTitle: Moments.hasMoment
                     ? Moments.latestTitle
-                    : AudioRuntime.hasTrack ? AudioRuntime.title : "Quiet Signals"
+                    : AudioRuntime.hasTrack
+                      ? AudioRuntime.title
+                      : AuroraI18n.text("demo.track")
         artist: Moments.hasMoment
                 ? Moments.latestArtist
-                : AudioRuntime.hasTrack ? AudioRuntime.artist : "Aurora Demo"
+                : AudioRuntime.hasTrack
+                  ? root.homeArtistLine
+                  : AuroraI18n.text("demo.artist")
         artworkSource: Moments.hasMoment
                        ? Moments.latestArtworkSource
                        : AudioRuntime.hasTrack
@@ -122,6 +157,7 @@ Item {
         identityVisible: root.identityVisible
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
+        mangaMode: true
         onActivated: {
             if (Moments.hasMoment)
                 root.recallLatestMoment()
@@ -145,21 +181,20 @@ Item {
         width: 132
         height: 42
         radius: 21
-        color: Moments.hasMoment
-               ? Qt.rgba(Moments.latestIdentityColor.r,
-                         Moments.latestIdentityColor.g,
-                         Moments.latestIdentityColor.b, 0.16)
-               : Qt.rgba(1, 1, 1, 0.055)
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.10)
+        color: AuroraTokens.mangaPanel
+        border.width: 2
+        border.color: Moments.hasMoment
+                      ? Moments.latestIdentityColor
+                      : AuroraTokens.mangaInk
 
         Text {
             anchors.centerIn: parent
             text: Moments.hasMoment
-                  ? "Memory · " + Moments.momentCount
-                  : "Memory"
-            color: AuroraTokens.textSecondary
+                  ? AuroraI18n.text("home.memory") + " · " + Moments.momentCount
+                  : AuroraI18n.text("home.memory")
+            color: AuroraTokens.mangaInk
             font.pixelSize: 13
+            font.weight: Font.DemiBold
         }
 
         TapHandler {

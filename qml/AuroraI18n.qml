@@ -1,0 +1,142 @@
+pragma Singleton
+
+import QtQuick
+
+QtObject {
+    id: root
+
+    property string language: "zh-Hant"
+
+    readonly property bool traditionalChinese: language === "zh-Hant"
+    readonly property string languageLabel: traditionalChinese ? "繁中" : "EN"
+    readonly property string alternateLanguageLabel: traditionalChinese ? "EN" : "繁中"
+
+    function toggleLanguage() {
+        language = traditionalChinese ? "en" : "zh-Hant"
+    }
+
+    function text(key) {
+        if (!traditionalChinese)
+            return englishText(key)
+
+        switch (key) {
+        case "home.begin": return "從一首歌開始。"
+        case "home.beginNote": return "讓一首本地歌曲，成為第一個被留下的房間。"
+        case "home.memory": return "記憶"
+        case "home.enter": return "進入"
+        case "home.latestFallback": return "安靜下來的房間"
+        case "home.currentSession": return "此刻的本地播放"
+        case "home.now": return "現在"
+        case "home.lateNight": return "深夜"
+        case "demo.track": return "失眠"
+        case "demo.artist": return "Suki 劉舒好"
+        case "music.back": return "返回"
+        case "music.sceneFlow": return "場景：流動"
+        case "music.sceneField": return "場景：靜場"
+        case "music.keepMoment": return "留下此刻"
+        case "music.keepAgain": return "再次留下"
+        case "music.changeMusic": return "換一首"
+        case "music.chooseMusic": return "選擇音樂"
+        case "music.library": return "曲庫"
+        case "music.scanning": return "掃描中"
+        case "music.scanMusic": return "掃描音樂"
+        case "music.addFolder": return "加入資料夾"
+        case "music.cancelScan": return "停止掃描"
+        case "music.playLibrary": return "播放曲庫"
+        case "music.chooseFolder": return "選擇資料夾"
+        case "music.rescanAll": return "重新掃描"
+        case "music.tracks": return "曲目"
+        case "music.playList": return "播放清單"
+        case "music.searchLibrary": return "搜尋曲庫"
+        case "music.noTracks": return "尚無曲目"
+        case "music.noMatches": return "沒有符合的曲目"
+        case "music.scanToBegin": return "先掃描音樂資料夾"
+        case "music.previous": return "上一首"
+        case "music.next": return "下一首"
+        case "music.volume": return "音量"
+        case "music.firstRunMusic": return "第一次使用 · 掃描音樂資料夾"
+        case "music.firstRunChoose": return "第一次使用 · 選擇音樂資料夾"
+        case "music.files": return "個檔案"
+        case "music.ready": return "首曲目可播放"
+        case "music.audioDialog": return "選擇本地音樂"
+        case "music.folderDialog": return "選擇音樂資料夾"
+        case "memory.title": return "記憶流"
+        case "memory.back": return "返回"
+        case "memory.hero": return "你的 Moment。"
+        case "memory.countOne": return "1 個 Moment 留在這台裝置"
+        case "memory.countMany": return "個 Moment 留在這台裝置"
+        case "memory.openFlow": return "展開記憶"
+        case "memory.closeFlow": return "收起記憶"
+        case "memory.empty": return "在音樂空間留下第一個 Moment。"
+        case "memory.meaning": return "你的意義"
+        case "memory.meaningHint": return "只寫下這一刻對你的意義。"
+        case "memory.saveMeaning": return "儲存意義"
+        case "memory.clearMeaning": return "清空意義"
+        case "memory.recall": return "召回此刻"
+        case "memory.manageSources": return "管理來源"
+        case "memory.unavailable": return "音樂來源暫時不可用，記憶仍保留"
+        default: return key
+        }
+    }
+
+    function englishText(key) {
+        switch (key) {
+        case "home.begin": return "Begin with a song."
+        case "home.beginNote": return "Let one local track become the first remembered room."
+        case "home.memory": return "Memory"
+        case "home.enter": return "Enter"
+        case "home.latestFallback": return "The room after midnight"
+        case "home.currentSession": return "Current local session"
+        case "home.now": return "Now"
+        case "home.lateNight": return "Late Night"
+        case "demo.track": return "Sleepless"
+        case "demo.artist": return "Suki Liu"
+        case "music.back": return "Back"
+        case "music.sceneFlow": return "Scene: Flow"
+        case "music.sceneField": return "Scene: Field"
+        case "music.keepMoment": return "Keep moment"
+        case "music.keepAgain": return "Keep again"
+        case "music.changeMusic": return "Change music"
+        case "music.chooseMusic": return "Choose music"
+        case "music.library": return "Library"
+        case "music.scanning": return "Scanning"
+        case "music.scanMusic": return "Scan Music"
+        case "music.addFolder": return "Add folder"
+        case "music.cancelScan": return "Cancel scan"
+        case "music.playLibrary": return "Play library"
+        case "music.chooseFolder": return "Choose folder"
+        case "music.rescanAll": return "Rescan all"
+        case "music.tracks": return "Tracks"
+        case "music.playList": return "Play list"
+        case "music.searchLibrary": return "Search library"
+        case "music.noTracks": return "No tracks"
+        case "music.noMatches": return "No matching tracks"
+        case "music.scanToBegin": return "Scan your Music folder to begin"
+        case "music.previous": return "Previous"
+        case "music.next": return "Next"
+        case "music.volume": return "Volume"
+        case "music.firstRunMusic": return "First run · scan Music folder"
+        case "music.firstRunChoose": return "First run · choose a music folder"
+        case "music.files": return "files"
+        case "music.ready": return "tracks ready"
+        case "music.audioDialog": return "Choose local music"
+        case "music.folderDialog": return "Choose music folder"
+        case "memory.title": return "Memory Flow"
+        case "memory.back": return "Back"
+        case "memory.hero": return "Your moments."
+        case "memory.countOne": return "1 moment kept on this device"
+        case "memory.countMany": return "moments kept on this device"
+        case "memory.openFlow": return "Open flow"
+        case "memory.closeFlow": return "Close flow"
+        case "memory.empty": return "Keep a moment in Music Space to begin."
+        case "memory.meaning": return "Your meaning"
+        case "memory.meaningHint": return "Add only what this moment means to you."
+        case "memory.saveMeaning": return "Save meaning"
+        case "memory.clearMeaning": return "Clear meaning"
+        case "memory.recall": return "Recall moment"
+        case "memory.manageSources": return "Manage sources"
+        case "memory.unavailable": return "Music source unavailable · memory preserved"
+        default: return key
+        }
+    }
+}

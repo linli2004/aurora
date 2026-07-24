@@ -9,6 +9,7 @@ Item {
     property real presenceLevel: 0.2
     property int accessibilityMode: AuroraTypes.AccessibilityNormal
     property int qualityMode: AuroraTypes.Balanced
+    property bool paperMode: false
 
     // Semantic audio inputs. They remain optional so Gallery and static
     // contexts can continue using the same Atmosphere primitive.
@@ -49,7 +50,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: AuroraTokens.windowBackground
+        color: root.paperMode ? "transparent" : AuroraTokens.windowBackground
     }
 
     Rectangle {
@@ -126,7 +127,12 @@ Item {
         anchors.fill: parent
         color: "transparent"
         border.width: 1
-        border.color: AuroraTokens.lineQuiet
+        border.color: root.paperMode
+                      ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                AuroraTokens.mangaInk.g,
+                                AuroraTokens.mangaInk.b,
+                                0.035)
+                      : AuroraTokens.lineQuiet
     }
 
 }

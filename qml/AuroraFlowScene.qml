@@ -9,6 +9,7 @@ Item {
     property real presenceLevel: 0.30
     property int accessibilityMode: AuroraTypes.AccessibilityNormal
     property int qualityMode: AuroraTypes.Balanced
+    property bool paperMode: false
 
     property bool audioReactiveAvailable: false
     property real audioLevel: 0.0
@@ -51,7 +52,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: AuroraTokens.windowBackground
+        color: root.paperMode ? "transparent" : AuroraTokens.windowBackground
     }
 
     // A broad depth veil keeps the scene quiet around the content while
@@ -68,7 +69,9 @@ Item {
             }
             GradientStop {
                 position: 0.58
-                color: Qt.rgba(0.02, 0.025, 0.04, 0.0)
+                color: root.paperMode
+                       ? Qt.rgba(1, 1, 1, 0.0)
+                       : Qt.rgba(0.02, 0.025, 0.04, 0.0)
             }
             GradientStop {
                 position: 1.0
@@ -212,16 +215,30 @@ Item {
         width: Math.min(root.width * 0.52, 650)
         height: Math.min(root.height * 0.70, 620)
         radius: Math.min(width, height) * 0.20
-        color: Qt.rgba(AuroraTokens.windowBackground.r,
-                       AuroraTokens.windowBackground.g,
-                       AuroraTokens.windowBackground.b,
-                       0.30 - root.level * 0.06)
+        color: root.paperMode
+               ? "transparent"
+               : Qt.rgba(AuroraTokens.windowBackground.r,
+                         AuroraTokens.windowBackground.g,
+                         AuroraTokens.windowBackground.b,
+                         0.30 - root.level * 0.06)
+        border.width: root.paperMode ? 2 : 0
+        border.color: root.paperMode
+                      ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                AuroraTokens.mangaInk.g,
+                                AuroraTokens.mangaInk.b,
+                                0.06 + root.high * 0.04)
+                      : "transparent"
     }
 
     Rectangle {
         anchors.fill: parent
         color: "transparent"
         border.width: 1
-        border.color: AuroraTokens.lineQuiet
+        border.color: root.paperMode
+                      ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                AuroraTokens.mangaInk.g,
+                                AuroraTokens.mangaInk.b,
+                                0.045)
+                      : AuroraTokens.lineQuiet
     }
 }

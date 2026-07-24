@@ -21,6 +21,11 @@ QtObject {
     readonly property color detachedAccent: "#9A927E"
     readonly property color lineSubtle: Qt.rgba(1, 1, 1, 0.09)
     readonly property color lineQuiet: Qt.rgba(1, 1, 1, 0.045)
+    readonly property color mangaPaper: "#F5EBD8"
+    readonly property color mangaPanel: "#FFF8EA"
+    readonly property color mangaWash: "#E6D5B9"
+    readonly property color mangaInk: "#211D1A"
+    readonly property color mangaMuted: "#70685F"
 
     // Spatial tokens
     readonly property int spacing4: 4
