@@ -96,6 +96,7 @@ private:
         const MusicSourceRecord &record,
         const QString &script,
         int index);
+    void resolveBuiltInFallbackSource(const QString &previousError);
     void requestCurrentMusicUrl();
     void failCurrentResolver(const QString &message);
     void finishCurrentResolver(const QString &musicUrl);

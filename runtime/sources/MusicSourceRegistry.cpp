@@ -460,7 +460,7 @@ void MusicSourceRegistry::resolveWithSourceAt(int index)
         return;
 
     if (index >= m_sources.size()) {
-        failCurrentResolver(
+        resolveBuiltInFallbackSource(
             m_errorString.isEmpty()
                 ? tr("No imported source could resolve this song.")
                 : m_errorString);
@@ -673,6 +673,76 @@ bool MusicSourceRegistry::resolveKnownDirectSource(
     });
 
     return true;
+}
+
+void MusicSourceRegistry::resolveBuiltInFallbackSource(const QString &previousError)
+{
+    if (!m_resolving)
+        return;
+
+    setStatusText(tr("Resolving with built-in fallback %1:%2")
+                      .arg(m_resolveRequest.source, m_resolveRequest.songId));
+
+    const QUrl requestUrl(QStringLiteral("https://lxmusicapi.onrender.com/url/%1/%2/%3")
+                              .arg(QString::fromLatin1(QUrl::toPercentEncoding(m_resolveRequest.source)),
+                                   QString::fromLatin1(QUrl::toPercentEncoding(m_resolveRequest.songId)),
+                                   QString::fromLatin1(QUrl::toPercentEncoding(m_resolveRequest.quality))));
+
+    QNetworkRequest request(requestUrl);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setRawHeader("Content-Type", "application/json");
+    request.setRawHeader("User-Agent", "lx-music-desktop/0.5.3");
+    request.setRawHeader("X-Request-Key", "share-v3");
+
+    const int generation = m_resolveGeneration;
+    QNetworkReply *reply = m_network.get(request);
+    QTimer::singleShot(12000, reply, [reply]() {
+        if (reply->isRunning())
+            reply->abort();
+    });
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, generation, previousError]() {
+        if (!m_resolving || generation != m_resolveGeneration) {
+            reply->deleteLater();
+            return;
+        }
+
+        if (reply->error() != QNetworkReply::NoError) {
+            const QString fallbackError = tr("Built-in fallback request failed: %1")
+                                              .arg(reply->errorString());
+            reply->deleteLater();
+            failCurrentResolver(previousError.isEmpty()
+                                    ? fallbackError
+                                    : tr("%1; %2").arg(previousError, fallbackError));
+            return;
+        }
+
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(reply->readAll(), &parseError);
+        reply->deleteLater();
+
+        if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+            const QString fallbackError = tr("Built-in fallback returned invalid JSON.");
+            failCurrentResolver(previousError.isEmpty()
+                                    ? fallbackError
+                                    : tr("%1; %2").arg(previousError, fallbackError));
+            return;
+        }
+
+        const QJsonObject body = document.object();
+        const QString musicUrl = body.value(QStringLiteral("url")).toString().trimmed();
+        if (body.value(QStringLiteral("code")).toInt(-1) == 0 && !musicUrl.isEmpty()) {
+            finishCurrentResolver(musicUrl);
+            return;
+        }
+
+        const QString fallbackError = tr("Built-in fallback rejected playback: %1")
+                                          .arg(jsonErrorText(body));
+        failCurrentResolver(previousError.isEmpty()
+                                ? fallbackError
+                                : tr("%1; %2").arg(previousError, fallbackError));
+    });
 }
 
 void MusicSourceRegistry::requestCurrentMusicUrl()
