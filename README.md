@@ -30,6 +30,7 @@ Implemented as an initial scaffold:
 - Minimal MPRIS integration for Ubuntu / GNOME media controls
 - Desktop identity packaging with a local `.desktop` entry and hicolor SVG icon
 - First-run library guidance with one-step Music folder scanning
+- Missing-source reconciliation with stable Track relink after file moves
 - Embedded artwork extraction with a trusted Generated Identity fallback
 - Decoded-audio feature analysis for level, bass, mid, high and transient presence
 - Audio-reactive Atmosphere with Reduced Motion and Eco fallbacks
@@ -40,7 +41,7 @@ Implemented as an initial scaffold:
 
 Deferred:
 
-- Full metadata index refinement, albums view and delete/relink commands
+- Full metadata index refinement, albums view, delete commands and interactive relink UX
 - Full persistent experience state including scene and transition personality
 - Emotion Graph and Intelligence Layer
 - Production Memory persistence

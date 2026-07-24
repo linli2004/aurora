@@ -40,6 +40,18 @@ LocalLibraryService::LocalLibraryService(QObject *parent)
     : QObject(parent)
     , m_databasePath(defaultDatabasePath())
 { const DefaultMusicDirectory defaultMusic = resolveDefaultMusicDirectory(); m_defaultMusicDirectory = defaultMusic.url; m_defaultMusicDirectoryLabel = defaultMusic.label; m_defaultMusicDirectoryAvailable = defaultMusic.available;
+    int startupMissingSources = 0;
+    {
+        LocalLibraryRepository repository;
+        if (repository.open(m_databasePath)
+            && repository.reconcileMissingSources(&startupMissingSources)
+            && startupMissingSources > 0) {
+            setLastScanStatus(tr("%n missing local source(s)", nullptr,
+                                 startupMissingSources));
+        }
+    }
+
+
     refreshCounts();
     refreshTracks();
 }
@@ -59,6 +71,11 @@ int LocalLibraryService::sourceCount() const
     return m_sourceCount;
 }
 
+int LocalLibraryService::missingSourceCount() const
+{
+    return m_missingSourceCount;
+}
+
 QString LocalLibraryService::databasePath() const
 {
     return m_databasePath;
@@ -72,7 +89,7 @@ QString LocalLibraryService::lastScanStatus() const
 QString LocalLibraryService::errorString() const
 {
     return m_errorString;
-} bool LocalLibraryService::firstRun() const { return !m_scanning && m_sourceCount == 0 && m_trackCount == 0; } QUrl LocalLibraryService::defaultMusicDirectory() const { return m_defaultMusicDirectory; } QString LocalLibraryService::defaultMusicDirectoryLabel() const { return m_defaultMusicDirectoryLabel; } bool LocalLibraryService::defaultMusicDirectoryAvailable() const { return m_defaultMusicDirectoryAvailable; }
+} bool LocalLibraryService::firstRun() const { return !m_scanning && m_sourceCount == 0 && m_trackCount == 0 && m_missingSourceCount == 0; } QUrl LocalLibraryService::defaultMusicDirectory() const { return m_defaultMusicDirectory; } QString LocalLibraryService::defaultMusicDirectoryLabel() const { return m_defaultMusicDirectoryLabel; } bool LocalLibraryService::defaultMusicDirectoryAvailable() const { return m_defaultMusicDirectoryAvailable; }
 
 int LocalLibraryService::scannedFileCount() const
 {
@@ -122,6 +139,7 @@ void LocalLibraryService::scanDefaultMusicDirectory() { if (!m_defaultMusicDirec
     QThread *worker = QThread::create([this, rootPath, databasePath, cancelFlag]() {
         LocalLibraryRepository repository;
         int scanned = 0;
+        int missingSources = 0;
         bool cancelled = false;
         QString error;
 
@@ -162,19 +180,33 @@ void LocalLibraryService::scanDefaultMusicDirectory() { if (!m_defaultMusicDirec
                     }, Qt::QueuedConnection);
                 }
             }
+            if (error.isEmpty() && !cancelled
+                && !repository.reconcileMissingSources(&missingSources)) {
+                error = repository.lastError();
+            }
+
         }
 
-        QMetaObject::invokeMethod(this, [this, scanned, cancelled, error]() {
+        QMetaObject::invokeMethod(this, [this, scanned, cancelled, error, missingSources]() {
             if (!error.isEmpty())
                 setErrorString(error);
             setScannedFileCount(scanned);
             refreshCounts();
             refreshTracks();
-            setLastScanStatus(error.isEmpty()
-                ? (cancelled
-                    ? tr("Scan cancelled after %1 local audio files").arg(scanned)
-                    : tr("Scanned %1 local audio files").arg(scanned))
-                : tr("Scan failed"));
+            QString completionStatus;
+        if (!error.isEmpty()) {
+            completionStatus = tr("Scan failed");
+        } else if (cancelled) {
+            completionStatus = tr("Scan cancelled after %1 local audio files").arg(scanned);
+        } else if (missingSources > 0) {
+            completionStatus =
+                tr("Scanned %1 local audio files · %n missing source(s)",
+                   nullptr, missingSources)
+                    .arg(scanned);
+        } else {
+            completionStatus = tr("Scanned %1 local audio files").arg(scanned);
+        }
+        setLastScanStatus(completionStatus);
             setScanning(false);
             m_cancelScan.reset();
         }, Qt::QueuedConnection);
@@ -234,17 +266,20 @@ void LocalLibraryService::refreshCounts()
     if (!repository.open(m_databasePath)) {
         m_trackCount = 0;
         m_sourceCount = 0;
+        m_missingSourceCount = 0;
         emit libraryChanged();
         return;
     }
 
     const int tracks = repository.trackCount();
     const int sources = repository.sourceCount();
-    if (m_trackCount == tracks && m_sourceCount == sources)
+    const int missingSources = repository.missingSourceCount();
+    if (m_trackCount == tracks && m_sourceCount == sources && m_missingSourceCount == missingSources)
         return;
 
     m_trackCount = tracks;
     m_sourceCount = sources;
+    m_missingSourceCount = missingSources;
     emit libraryChanged();
 }
 

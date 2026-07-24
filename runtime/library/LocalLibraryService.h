@@ -15,7 +15,7 @@ class LocalLibraryService final : public QObject
 
     Q_PROPERTY(bool scanning READ scanning NOTIFY scanningChanged)
     Q_PROPERTY(int trackCount READ trackCount NOTIFY libraryChanged)
-    Q_PROPERTY(int sourceCount READ sourceCount NOTIFY libraryChanged)
+    Q_PROPERTY(int sourceCount READ sourceCount NOTIFY libraryChanged) Q_PROPERTY(int missingSourceCount READ missingSourceCount NOTIFY libraryChanged)
     Q_PROPERTY(QString databasePath READ databasePath CONSTANT)
     Q_PROPERTY(QString lastScanStatus READ lastScanStatus NOTIFY scanStatusChanged)
     Q_PROPERTY(QString errorString READ errorString NOTIFY errorChanged) Q_PROPERTY(bool firstRun READ firstRun NOTIFY libraryChanged) Q_PROPERTY(QUrl defaultMusicDirectory READ defaultMusicDirectory CONSTANT) Q_PROPERTY(QString defaultMusicDirectoryLabel READ defaultMusicDirectoryLabel CONSTANT) Q_PROPERTY(bool defaultMusicDirectoryAvailable READ defaultMusicDirectoryAvailable CONSTANT)
@@ -29,7 +29,7 @@ public:
 
     [[nodiscard]] bool scanning() const;
     [[nodiscard]] int trackCount() const;
-    [[nodiscard]] int sourceCount() const;
+    [[nodiscard]] int sourceCount() const; [[nodiscard]] int missingSourceCount() const;
     [[nodiscard]] QString databasePath() const;
     [[nodiscard]] QString lastScanStatus() const;
     [[nodiscard]] QString errorString() const; [[nodiscard]] bool firstRun() const; [[nodiscard]] QUrl defaultMusicDirectory() const; [[nodiscard]] QString defaultMusicDirectoryLabel() const; [[nodiscard]] bool defaultMusicDirectoryAvailable() const;
@@ -70,7 +70,7 @@ private:
     bool m_scanning = false;
     int m_scannedFileCount = 0;
     int m_trackCount = 0;
-    int m_sourceCount = 0;
+    int m_sourceCount = 0; int m_missingSourceCount = 0;
     QString m_lastScanStatus;
     QString m_errorString;
     QString m_searchText;

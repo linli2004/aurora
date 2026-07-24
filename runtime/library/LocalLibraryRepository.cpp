@@ -1,6 +1,8 @@
 #include "runtime/library/LocalLibraryRepository.h"
 
 #include <QCoreApplication>
+
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSqlError>
@@ -66,7 +68,9 @@ QString LocalLibraryRepository::lastError() const
 int LocalLibraryRepository::trackCount() const
 {
     QSqlQuery query(m_database);
-    if (!query.exec(QStringLiteral("SELECT COUNT(*) FROM tracks"))) {
+    if (!query.exec(QStringLiteral(
+            "SELECT COUNT(DISTINCT track_id) FROM track_sources "
+            "WHERE availability = 'Available'"))) {
         return 0;
     }
     return query.next() ? query.value(0).toInt() : 0;
@@ -75,7 +79,20 @@ int LocalLibraryRepository::trackCount() const
 int LocalLibraryRepository::sourceCount() const
 {
     QSqlQuery query(m_database);
-    if (!query.exec(QStringLiteral("SELECT COUNT(*) FROM track_sources"))) {
+    if (!query.exec(QStringLiteral(
+            "SELECT COUNT(*) FROM track_sources "
+            "WHERE availability = 'Available'"))) {
+        return 0;
+    }
+    return query.next() ? query.value(0).toInt() : 0;
+}
+
+int LocalLibraryRepository::missingSourceCount() const
+{
+    QSqlQuery query(m_database);
+    if (!query.exec(QStringLiteral(
+            "SELECT COUNT(*) FROM track_sources "
+            "WHERE availability = 'Unavailable'"))) {
         return 0;
     }
     return query.next() ? query.value(0).toInt() : 0;
@@ -86,9 +103,18 @@ QStringList LocalLibraryRepository::playableFilePaths() const
     QStringList paths;
     QSqlQuery query(m_database);
     if (!query.exec(QStringLiteral(
-            "SELECT file_path FROM track_sources "
-            "WHERE availability = 'Available' "
-            "ORDER BY file_path"))) {
+            "SELECT s.file_path FROM track_sources s "
+            "WHERE s.availability = 'Available' "
+            "AND s.source_id = ("
+            "SELECT s2.source_id FROM track_sources s2 "
+            "WHERE s2.track_id = s.track_id "
+            "AND s2.availability = 'Available' "
+            "ORDER BY COALESCE(s2.last_verified_at, '') DESC, "
+            "COALESCE(s2.updated_at, '') DESC, "
+            "s2.file_path ASC, s2.source_id ASC "
+            "LIMIT 1"
+            ") "
+            "ORDER BY s.file_path"))) {
         return paths;
     }
 
@@ -97,10 +123,12 @@ QStringList LocalLibraryRepository::playableFilePaths() const
     return paths;
 }
 
-QList<LocalLibraryTrackRecord> LocalLibraryRepository::tracks(const QString &searchText) const
+QList<LocalLibraryTrackRecord> LocalLibraryRepository::tracks(
+    const QString &searchText) const
 {
     QList<LocalLibraryTrackRecord> records;
     QSqlQuery query(m_database);
+
     const QString trimmedSearch = searchText.trimmed().toCaseFolded();
     const bool hasSearch = !trimmedSearch.isEmpty();
 
@@ -109,12 +137,28 @@ QList<LocalLibraryTrackRecord> LocalLibraryRepository::tracks(const QString &sea
         "s.file_path, s.availability, s.file_size, s.modified_time "
         "FROM track_sources s "
         "JOIN tracks t ON t.track_id = s.track_id "
-        "WHERE s.availability = 'Available'");
+        "WHERE s.availability = 'Available' "
+        "AND s.source_id = ("
+        "SELECT s2.source_id FROM track_sources s2 "
+        "WHERE s2.track_id = s.track_id "
+        "AND s2.availability = 'Available' "
+        "ORDER BY COALESCE(s2.last_verified_at, '') DESC, "
+        "COALESCE(s2.updated_at, '') DESC, "
+        "s2.file_path ASC, s2.source_id ASC "
+        "LIMIT 1"
+        ")");
+
     if (hasSearch) {
         sql += QStringLiteral(
             " AND (t.canonical_title LIKE ? OR t.artist LIKE ? OR t.album LIKE ? "
-            "OR s.file_path LIKE ?)");
+            "OR EXISTS ("
+            "SELECT 1 FROM track_sources search_source "
+            "WHERE search_source.track_id = t.track_id "
+            "AND search_source.availability = 'Available' "
+            "AND search_source.file_path LIKE ?"
+            "))");
     }
+
     sql += QStringLiteral(" ORDER BY t.canonical_title, s.file_path");
 
     if (!query.prepare(sql))
@@ -213,6 +257,73 @@ bool LocalLibraryRepository::initializeSchema()
         && execSchema(QStringLiteral(
                "CREATE INDEX IF NOT EXISTS idx_tracks_canonical_title "
                "ON tracks(canonical_title)"));
+}
+
+bool LocalLibraryRepository::reconcileMissingSources(int *markedMissing)
+{
+    if (markedMissing)
+        *markedMissing = 0;
+
+    QSqlQuery sources(m_database);
+    if (!sources.exec(QStringLiteral(
+            "SELECT source_id, file_path FROM track_sources "
+            "WHERE source_kind = 'LocalFile' AND availability = 'Available'"))) {
+        m_lastError = sources.lastError().text();
+        return false;
+    }
+
+    QStringList missingSourceIds;
+    while (sources.next()) {
+        const QString sourceId = sources.value(0).toString();
+        const QFileInfo fileInfo(sources.value(1).toString());
+        if (!fileInfo.exists() || !fileInfo.isFile() || !fileInfo.isReadable())
+            missingSourceIds.append(sourceId);
+    }
+    sources.finish();
+
+    if (missingSourceIds.isEmpty())
+        return true;
+
+    if (!m_database.transaction()) {
+        m_lastError = m_database.lastError().text();
+        return false;
+    }
+
+    const QString timestamp = nowUtc();
+    const QString reconciliationProvenance =
+        provenanceJson(QStringLiteral("AUR-025 missing-source reconciliation"));
+
+    QSqlQuery update(m_database);
+    update.prepare(QStringLiteral(
+        "UPDATE track_sources SET "
+        "availability = 'Unavailable',"
+        "availability_reason = 'Missing',"
+        "last_verified_at = ?,"
+        "updated_at = ?,"
+        "provenance_json = ? "
+        "WHERE source_id = ? AND availability = 'Available'"));
+
+    for (const QString &sourceId : missingSourceIds) {
+        update.bindValue(0, timestamp);
+        update.bindValue(1, timestamp);
+        update.bindValue(2, reconciliationProvenance);
+        update.bindValue(3, sourceId);
+
+        if (!update.exec()) {
+            m_lastError = update.lastError().text();
+            m_database.rollback();
+            return false;
+        }
+    }
+
+    if (!m_database.commit()) {
+        m_lastError = m_database.lastError().text();
+        return false;
+    }
+
+    if (markedMissing)
+        *markedMissing = missingSourceIds.size();
+    return true;
 }
 
 bool LocalLibraryRepository::upsertSource(const LocalLibrarySourceRecord &record)

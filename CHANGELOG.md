@@ -19,6 +19,9 @@
 - Added CMake install rules for the Aurora binary, desktop entry and app icon.
 - Added first-run library guidance and a one-step scan action for the user's Music folder.
 - Exposed default Music-directory availability through `LocalLibraryService` for QML.
+- Added missing-source reconciliation and stable Track relink after local file moves.
+- Active library counts and playable lists now exclude unavailable source rows.
+- Track-oriented library queries now project one preferred Available source per stable Track.
 - Added repository tests for schema creation, TrackSource persistence and duplicate content.
 - Added repository tests for track search and settings persistence.
 - Added stable local Track ID generation from bounded file-content sampling.
