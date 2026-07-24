@@ -9,12 +9,46 @@ Item {
     property int qualityMode: AuroraTypes.Balanced
     property rect transitionStartRect: Qt.rect(0, 0, 0, 0)
     property rect transitionEndRect: Qt.rect(0, 0, 0, 0)
+    property string transitionTitle: "Quiet Signals"
+    property string transitionArtist: "Aurora Demo"
+    property url transitionArtworkSource:
+        "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
+    property color transitionIdentityColor: AuroraTokens.coolAccent
 
     readonly property bool identityTransitionRunning: identityTransition.visible
+
+    function prepareCurrentIdentity() {
+        transitionTitle = AudioRuntime.hasTrack ? AudioRuntime.title : "Quiet Signals"
+        transitionArtist = AudioRuntime.hasTrack ? AudioRuntime.artist : "Aurora Demo"
+        transitionArtworkSource = AudioRuntime.hasTrack
+                ? AudioRuntime.artworkSource
+                : "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
+        transitionIdentityColor =
+                AudioRuntime.hasTrack && AudioRuntime.identityColorAvailable
+                ? AudioRuntime.identityColor
+                : AuroraTokens.coolAccent
+    }
 
     function enterMusicSpace() {
         if (identityTransitionRunning)
             return
+
+        prepareCurrentIdentity()
+        transitionStartRect = home.identityAnchorRect()
+        transitionEndRect = musicSpace.identityAnchorRect()
+        identityTransition.startForward()
+        currentPage = 1
+    }
+
+    function recallLatestMoment() {
+        if (identityTransitionRunning || !Moments.latestAvailable)
+            return
+
+        transitionTitle = Moments.latestTitle
+        transitionArtist = Moments.latestArtist
+        transitionArtworkSource = Moments.latestArtworkSource
+        transitionIdentityColor = Moments.latestIdentityColor
+        AudioRuntime.setQueue([Moments.latestUrl])
 
         transitionStartRect = home.identityAnchorRect()
         transitionEndRect = musicSpace.identityAnchorRect()
@@ -26,10 +60,18 @@ Item {
         if (identityTransitionRunning)
             return
 
+        prepareCurrentIdentity()
         transitionStartRect = home.identityAnchorRect()
         transitionEndRect = musicSpace.identityAnchorRect()
         identityTransition.startReverse()
         currentPage = 0
+    }
+
+    Connections {
+        target: LocalLibrary
+        function onLibraryChanged() {
+            Moments.refresh()
+        }
     }
 
     AuroraHome {
@@ -45,6 +87,7 @@ Item {
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
         onOpenMusicSpace: root.enterMusicSpace()
+        onRecallLatestMoment: root.recallLatestMoment()
         onOpenGallery: root.currentPage = 2
 
         Behavior on opacity {
@@ -105,13 +148,9 @@ Item {
         toRect: root.transitionEndRect
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
-        title: AudioRuntime.hasTrack ? AudioRuntime.title : "Quiet Signals"
-        artist: AudioRuntime.hasTrack ? AudioRuntime.artist : "Aurora Demo"
-        artworkSource: AudioRuntime.hasTrack
-                       ? AudioRuntime.artworkSource
-                       : "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
-        colorSignature: AudioRuntime.hasTrack && AudioRuntime.identityColorAvailable
-                        ? AudioRuntime.identityColor
-                        : AuroraTokens.coolAccent
+        title: root.transitionTitle
+        artist: root.transitionArtist
+        artworkSource: root.transitionArtworkSource
+        colorSignature: root.transitionIdentityColor
     }
 }

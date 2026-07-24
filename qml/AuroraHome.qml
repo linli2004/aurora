@@ -10,6 +10,7 @@ Item {
     property bool transitioning: false
 
     signal openMusicSpace()
+    signal recallLatestMoment()
     signal openGallery()
 
     function identityAnchorRect() {
@@ -68,27 +69,61 @@ Item {
         id: currentMoment
         anchors.centerIn: parent
         sizePreset: root.width < 980 ? 0 : 1
-        title: AudioRuntime.hasTrack ? "Current local session" : "The room after midnight"
-        periodLabel: AudioRuntime.hasTrack ? "Now" : "Late Summer Night"
-        trackTitle: AudioRuntime.hasTrack ? AudioRuntime.title : "Quiet Signals"
-        artist: AudioRuntime.hasTrack ? AudioRuntime.artist : "Aurora Demo"
-        artworkSource: AudioRuntime.hasTrack
-                       ? AudioRuntime.artworkSource
-                       : "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
-        emotionColor: AudioRuntime.hasTrack && AudioRuntime.identityColorAvailable
-                      ? AudioRuntime.identityColor
-                      : AuroraTokens.coolAccent
-        confirmedUserNote: AudioRuntime.hasTrack ? "Local-first playback." : "A quiet beginning."
+        title: Moments.hasMoment
+               ? "A moment kept on this device"
+               : AudioRuntime.hasTrack
+                 ? "Current local session"
+                 : "The room after midnight"
+        periodLabel: Moments.hasMoment
+                     ? Moments.latestPeriodLabel
+                     : AudioRuntime.hasTrack ? "Now" : "Late Summer Night"
+        trackTitle: Moments.hasMoment
+                    ? Moments.latestTitle
+                    : AudioRuntime.hasTrack ? AudioRuntime.title : "Quiet Signals"
+        artist: Moments.hasMoment
+                ? Moments.latestArtist
+                : AudioRuntime.hasTrack ? AudioRuntime.artist : "Aurora Demo"
+        artworkSource: Moments.hasMoment
+                       ? Moments.latestArtworkSource
+                       : AudioRuntime.hasTrack
+                         ? AudioRuntime.artworkSource
+                         : "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
+        emotionColor: Moments.hasMoment
+                      ? Moments.latestIdentityColor
+                      : AudioRuntime.hasTrack && AudioRuntime.identityColorAvailable
+                        ? AudioRuntime.identityColor
+                        : AuroraTokens.coolAccent
+        confirmedUserNote: Moments.hasMoment
+                           ? Moments.latestConfirmedMeaning
+                           : ""
+        availability: Moments.hasMoment && !Moments.latestAvailable
+                      ? AuroraTypes.AvailabilityDetached
+                      : AuroraTypes.AvailabilityActive
         experienceState: root.transitioning
                          ? AuroraTypes.MomentRecalling
-                         : AudioRuntime.hasTrack
-                           ? AuroraTypes.MomentPresent
-                           : AuroraTypes.MomentMeaningful
+                         : Moments.hasMoment
+                           ? Moments.latestAvailable
+                             ? AuroraTypes.MomentRemembered
+                             : AuroraTypes.MomentDetached
+                           : AudioRuntime.hasTrack
+                             ? AuroraTypes.MomentPresent
+                             : AuroraTypes.MomentDormant
         identityVisible: root.identityVisible
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
-        onActivated: root.openMusicSpace()
-        onRecallRequested: root.openMusicSpace()
+        onActivated: {
+            if (Moments.hasMoment)
+                root.recallLatestMoment()
+            else
+                root.openMusicSpace()
+        }
+        onRecallRequested: {
+            if (Moments.hasMoment)
+                root.recallLatestMoment()
+            else
+                root.openMusicSpace()
+        }
+        onRelinkRequested: root.openMusicSpace()
     }
 
     Rectangle {

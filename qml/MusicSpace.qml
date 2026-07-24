@@ -26,6 +26,10 @@ Item {
         AudioRuntime.duration > 0 ? Math.min(1, AudioRuntime.position / AudioRuntime.duration) : 0
     readonly property bool libraryBrowserAvailable: LocalLibrary.sourceCount > 0 || LocalLibrary.searchText.length > 0
     readonly property string firstRunLibraryMessage: LocalLibrary.defaultMusicDirectoryAvailable ? "First run · scan Music folder" : "First run · choose a music folder"
+    readonly property bool currentMomentKeepable:
+        AudioRuntime.hasTrack
+        && AudioRuntime.trackId.length > 0
+        && AudioRuntime.filePath.length > 0
 
     signal closeRequested()
 
@@ -41,6 +45,22 @@ Item {
         const minutes = Math.floor(totalSeconds / 60)
         const seconds = totalSeconds % 60
         return minutes + ":" + (seconds < 10 ? "0" : "") + seconds
+    }
+
+    function keepCurrentMoment() {
+        if (!root.currentMomentKeepable)
+            return
+
+        Moments.keepCurrentMoment(
+            AudioRuntime.trackId,
+            AudioRuntime.sourceId,
+            AudioRuntime.filePath,
+            AudioRuntime.title,
+            AudioRuntime.artist,
+            AudioRuntime.album,
+            AudioRuntime.artworkSource,
+            root.displayIdentityColor,
+            "")
     }
 
     function beginTrackTransition(direction) {
@@ -82,6 +102,12 @@ Item {
         }
         if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_L) {
             libraryDialog.open()
+            event.accepted = true
+            return
+        }
+        if (event.key === Qt.Key_K
+                && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
+            root.keepCurrentMoment()
             event.accepted = true
             return
         }
@@ -193,7 +219,7 @@ Item {
 
     Rectangle {
         anchors.right: parent.right
-        anchors.rightMargin: 300
+        anchors.rightMargin: 436
         anchors.top: parent.top
         anchors.topMargin: 28
         width: 124
@@ -219,6 +245,61 @@ Item {
         }
 
         TapHandler { onTapped: root.flowSceneEnabled = !root.flowSceneEnabled }
+    }
+
+    Rectangle {
+        anchors.right: parent.right
+        anchors.rightMargin: 300
+        anchors.top: parent.top
+        anchors.topMargin: 28
+        width: 124
+        height: 42
+        radius: 21
+        color: root.currentMomentKeepable
+               ? Qt.rgba(root.displayIdentityColor.r,
+                         root.displayIdentityColor.g,
+                         root.displayIdentityColor.b, 0.16)
+               : Qt.rgba(1, 1, 1, 0.045)
+        border.width: 1
+        border.color: root.currentMomentKeepable
+                      ? Qt.rgba(root.displayIdentityColor.r,
+                                root.displayIdentityColor.g,
+                                root.displayIdentityColor.b, 0.36)
+                      : Qt.rgba(1, 1, 1, 0.08)
+
+        Text {
+            anchors.centerIn: parent
+            text: Moments.latestTrackId === AudioRuntime.trackId
+                  ? "Keep again"
+                  : "Keep moment"
+            color: root.currentMomentKeepable
+                   ? AuroraTokens.textSecondary
+                   : AuroraTokens.textMuted
+            font.pixelSize: 12
+        }
+
+        TapHandler {
+            enabled: root.currentMomentKeepable
+            onTapped: root.keepCurrentMoment()
+        }
+    }
+
+    Text {
+        anchors.right: parent.right
+        anchors.rightMargin: 300
+        anchors.top: parent.top
+        anchors.topMargin: 76
+        width: 124
+        horizontalAlignment: Text.AlignHCenter
+        text: Moments.errorString.length > 0
+              ? Moments.errorString
+              : Moments.lastStatus
+        color: Moments.errorString.length > 0
+               ? AuroraTokens.warmAccent
+               : AuroraTokens.textMuted
+        font.pixelSize: 10
+        elide: Text.ElideRight
+        visible: text.length > 0
     }
 
     Rectangle {

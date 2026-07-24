@@ -40,6 +40,13 @@ qt_add_executable(aurora
     runtime/platform/MprisService.h
 )
 
+target_sources(aurora PRIVATE
+    runtime/memory/MomentRepository.cpp
+    runtime/memory/MomentRepository.h
+    runtime/memory/MomentService.cpp
+    runtime/memory/MomentService.h
+)
+
 set(AURORA_QML_FILES
     qml/Main.qml
     qml/AppShell.qml
@@ -183,6 +190,20 @@ if(BUILD_TESTING)
     )
     add_test(NAME aurora.local_library_repository COMMAND aurora_local_library_repository_tests)
 
+    qt_add_executable(aurora_moment_repository_tests
+        tests/test_moment_repository.cpp
+        runtime/memory/MomentRepository.cpp
+        runtime/memory/MomentRepository.h
+    )
+    target_include_directories(aurora_moment_repository_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(aurora_moment_repository_tests PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Sql
+        Qt6::Test
+    )
+    add_test(NAME aurora.moment_repository COMMAND aurora_moment_repository_tests)
+
     qt_add_executable(aurora_local_library_watcher_tests
         tests/test_local_library_watcher.cpp
         runtime/library/LocalLibraryWatcher.cpp
@@ -230,6 +251,13 @@ if(BUILD_TESTING)
         runtime/library/LocalLibraryWatcher.cpp
         runtime/library/LocalLibraryWatcher.h
     )
+    target_sources(aurora_snapshot_smoke PRIVATE
+        runtime/memory/MomentRepository.cpp
+        runtime/memory/MomentRepository.h
+        runtime/memory/MomentService.cpp
+        runtime/memory/MomentService.h
+    )
+
     set_target_properties(aurora_snapshot_smoke PROPERTIES
         QT_QML_MODULE_NO_IMPORT_SCAN TRUE
     )

@@ -29,6 +29,10 @@ REQUIRED = [
     "runtime/library/LocalLibraryTrackModel.cpp",
     "runtime/library/LocalLibraryWatcher.h",
     "runtime/library/LocalLibraryWatcher.cpp",
+    "runtime/memory/MomentRepository.h",
+    "runtime/memory/MomentRepository.cpp",
+    "runtime/memory/MomentService.h",
+    "runtime/memory/MomentService.cpp",
     "qml/Main.qml",
     "qml/AuroraTokens.qml",
     "qml/AudioDiagnostics.qml",
@@ -47,6 +51,7 @@ REQUIRED = [
     "tests/test_local_track_identity.cpp",
     "tests/test_local_library_repository.cpp",
     "tests/test_local_library_watcher.cpp",
+    "tests/test_moment_repository.cpp",
     "docs/engineering/MVP_v0.1.md",
     "docs/engineering/ARCHITECTURE.md",
     "docs/reviews/AUR-024_INSTALLED_RUNTIME_FIRST_RUN_REVIEW.md",
@@ -56,6 +61,8 @@ REQUIRED = [
     "docs/reviews/AUR-026_PERSISTENT_LIBRARY_ROOTS_RESCAN_REVIEW.md",
     "docs/tasks/AUR-026_PERSISTENT_LIBRARY_ROOTS_RESCAN.md",
     "docs/reviews/AUR-027_AUTOMATIC_LIBRARY_REFRESH_REVIEW.md",
+    "docs/tasks/AUR-028_FIRST_REAL_MOMENT_LOOP.md",
+    "docs/reviews/AUR-028_FIRST_REAL_MOMENT_LOOP_REVIEW.md",
     "docs/tasks/AUR-027_AUTOMATIC_LIBRARY_REFRESH.md",
 ]
 
