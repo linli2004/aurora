@@ -74,7 +74,7 @@ Item {
 
         Text {
             text: root.showingLatestMoment
-                  ? Moments.latestHeading
+                  ? AuroraI18n.momentHeading(Moments.latestHeading)
                   : AudioRuntime.hasTrack
                     ? AuroraI18n.text("home.currentSession")
                   : AuroraI18n.text("home.begin")
@@ -116,12 +116,12 @@ Item {
         anchors.centerIn: parent
         sizePreset: root.width < 980 ? 0 : 1
         title: root.showingLatestMoment
-               ? Moments.latestHeading
+               ? AuroraI18n.momentHeading(Moments.latestHeading)
                : AudioRuntime.hasTrack
                  ? AuroraI18n.text("home.currentSession")
                  : AuroraI18n.text("home.latestFallback")
         periodLabel: root.showingLatestMoment
-                     ? Moments.latestPeriodLabel
+                     ? AuroraI18n.momentPeriod(Moments.latestPeriodLabel)
                      : AudioRuntime.hasTrack
                        ? AuroraI18n.text("home.now")
                        : AuroraI18n.text("home.lateNight")

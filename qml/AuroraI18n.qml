@@ -15,6 +15,35 @@ QtObject {
         language = traditionalChinese ? "en" : "zh-Hant"
     }
 
+    function momentHeading(value) {
+        if (!traditionalChinese)
+            return value
+
+        switch (value) {
+        case "After midnight": return "凌晨"
+        case "This morning": return "今早"
+        case "This afternoon": return "午後"
+        case "This evening": return "今晚"
+        case "Late tonight": return "深夜"
+        case "A remembered moment": return "被留下的 Moment"
+        default: return value
+        }
+    }
+
+    function momentPeriod(value) {
+        if (!traditionalChinese)
+            return value
+
+        switch (value) {
+        case "After Midnight": return "凌晨"
+        case "Morning": return "早晨"
+        case "Afternoon": return "午後"
+        case "Evening": return "夜晚"
+        case "Late Night": return "深夜"
+        default: return value
+        }
+    }
+
     function text(key) {
         if (!traditionalChinese)
             return englishText(key)
@@ -25,7 +54,7 @@ QtObject {
         case "home.memory": return "記憶"
         case "home.enter": return "進入"
         case "home.latestFallback": return "安靜下來的房間"
-        case "home.currentSession": return "此刻的本地播放"
+        case "home.currentSession": return "此刻正在播放"
         case "home.now": return "現在"
         case "home.lateNight": return "深夜"
         case "demo.track": return "失眠"
@@ -106,7 +135,7 @@ QtObject {
         case "home.memory": return "Memory"
         case "home.enter": return "Enter"
         case "home.latestFallback": return "The room after midnight"
-        case "home.currentSession": return "Current local session"
+        case "home.currentSession": return "Current session"
         case "home.now": return "Now"
         case "home.lateNight": return "Late Night"
         case "demo.track": return "Sleepless"

@@ -4,6 +4,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QTemporaryDir>
+#include <QUrl>
 
 #include "runtime/memory/MomentRepository.h"
 
@@ -16,6 +17,7 @@ private slots:
     void storesMultipleMomentsNewestFirst();
     void updatesConfirmedMeaningWithoutChangingIdentity();
     void resolvesRelinkedTrackSource();
+    void resolvesNetworkMomentUrl();
     void keepsDetachedMemoryWhenSourceIsMissing();
 };
 
@@ -195,6 +197,30 @@ void MomentRepositoryTest::resolvesRelinkedTrackSource()
     QVERIFY(latest.has_value());
     QCOMPARE(repository.resolvedPlayablePath(*latest),
              QFileInfo(newPath).canonicalFilePath());
+}
+
+void MomentRepositoryTest::resolvesNetworkMomentUrl()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    MomentRepository repository(QStringLiteral("moment-test-network"));
+    QVERIFY(repository.open(
+        directory.filePath(QStringLiteral("library.sqlite"))));
+
+    MomentRecord moment = sampleMoment(
+        QStringLiteral("https://cdn.example.com/audio/hoshi.mp3?token=demo"),
+        QStringLiteral("moment:network"));
+    moment.trackId = QStringLiteral("track:network-url:v1:test");
+    moment.sourceId = QStringLiteral("source:network-url:v1:test");
+
+    QVERIFY2(repository.keepMoment(moment), qPrintable(repository.lastError()));
+
+    const auto latest = repository.latestMoment();
+    QVERIFY(latest.has_value());
+    QVERIFY(repository.resolvedPlayablePath(*latest).isEmpty());
+    QCOMPARE(repository.resolvedPlayableUrl(*latest),
+             QUrl(QStringLiteral("https://cdn.example.com/audio/hoshi.mp3?token=demo")));
 }
 
 void MomentRepositoryTest::keepsDetachedMemoryWhenSourceIsMissing()

@@ -86,7 +86,7 @@ public:
     Q_INVOKABLE bool keepCurrentMoment(
         const QString &trackId,
         const QString &sourceId,
-        const QString &filePath,
+        const QUrl &sourceUrl,
         const QString &title,
         const QString &artist,
         const QString &album,
@@ -110,10 +110,10 @@ private:
     [[nodiscard]] QString headingForPeriod(const QString &period) const;
     [[nodiscard]] QVariantMap momentItem(
         const MomentRecord &moment,
-        const QString &resolvedPlayablePath) const;
+        const QUrl &resolvedPlayableUrl) const;
     void setSelectedMoment(
         const std::optional<MomentRecord> &moment,
-        const QString &resolvedPlayablePath);
+        const QUrl &resolvedPlayableUrl);
     void setLastStatus(const QString &status);
     void setErrorString(const QString &error);
 
@@ -124,8 +124,8 @@ private:
     std::optional<MomentRecord> m_latestMoment;
     std::optional<MomentRecord> m_selectedMoment;
     int m_momentCount = 0;
-    QString m_latestPlayablePath;
-    QString m_selectedPlayablePath;
+    QUrl m_latestPlayableUrl;
+    QUrl m_selectedPlayableUrl;
     QString m_lastStatus;
     QString m_errorString;
 };

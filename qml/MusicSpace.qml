@@ -58,7 +58,7 @@ Item {
     readonly property bool currentMomentKeepable:
         AudioRuntime.hasTrack
         && AudioRuntime.trackId.length > 0
-        && AudioRuntime.filePath.length > 0
+        && AudioRuntime.source.toString().length > 0
     readonly property string sourcePanelStatus:
         MusicSources.busy
         ? AuroraI18n.text("music.sourceImporting")
@@ -99,7 +99,7 @@ Item {
         if (Moments.keepCurrentMoment(
             AudioRuntime.trackId,
             AudioRuntime.sourceId,
-            AudioRuntime.filePath,
+            AudioRuntime.source,
             AudioRuntime.title,
             AudioRuntime.artist,
             AudioRuntime.album,

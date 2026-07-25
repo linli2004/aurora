@@ -4,6 +4,7 @@
 #include <QList>
 #include <QSqlDatabase>
 #include <QString>
+#include <QUrl>
 
 #include <optional>
 
@@ -37,6 +38,8 @@ public:
         const QString &momentId) const;
     [[nodiscard]] std::optional<MomentRecord> latestMoment() const;
     [[nodiscard]] QString resolvedPlayablePath(
+        const MomentRecord &moment) const;
+    [[nodiscard]] QUrl resolvedPlayableUrl(
         const MomentRecord &moment) const;
 
     bool initializeSchema();

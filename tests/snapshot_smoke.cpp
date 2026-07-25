@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QImage>
 #include <QJSEngine>
+#include <QMetaObject>
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -203,6 +204,23 @@ int main(int argc, char *argv[])
             track.insert(QStringLiteral("artist"), QStringLiteral("Source Catalog"));
             track.insert(QStringLiteral("album"), QStringLiteral("Online Demo"));
             audioRuntime.setQueueWithMetadata({track});
+
+            if (QQuickItem *shell = findAppShell(window))
+                shell->setProperty("currentPage", 0);
+        }
+
+        if (mode == QStringLiteral("home-online-kept-moment")) {
+            QVariantMap track;
+            track.insert(QStringLiteral("url"), QStringLiteral("https://cdn.example.com/audio/hoshi.mp3?token=demo"));
+            track.insert(QStringLiteral("title"), QStringLiteral("星光測試"));
+            track.insert(QStringLiteral("artist"), QStringLiteral("Source Catalog"));
+            track.insert(QStringLiteral("album"), QStringLiteral("Online Demo"));
+            audioRuntime.setQueueWithMetadata({track});
+
+            if (QQuickItem *musicSpace = findItemWithProperty(
+                    window->contentItem(), "sourcePanelExpanded")) {
+                QMetaObject::invokeMethod(musicSpace, "keepCurrentMoment");
+            }
 
             if (QQuickItem *shell = findAppShell(window))
                 shell->setProperty("currentPage", 0);

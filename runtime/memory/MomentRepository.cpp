@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QUrl>
 #include <QUuid>
 
 #include <utility>
@@ -23,6 +24,22 @@ QString normalizedReadablePath(const QString &path)
 
     const QString canonical = info.canonicalFilePath();
     return canonical.isEmpty() ? info.absoluteFilePath() : canonical;
+}
+
+bool isNetworkAudioUrl(const QUrl &url)
+{
+    const QString scheme = url.scheme().toCaseFolded();
+    return (scheme == QStringLiteral("http") || scheme == QStringLiteral("https"))
+        && !url.host().isEmpty();
+}
+
+QUrl networkAudioUrl(const QString &value)
+{
+    const QUrl url = QUrl::fromUserInput(value);
+    if (!isNetworkAudioUrl(url))
+        return {};
+
+    return url.adjusted(QUrl::NormalizePathSegments | QUrl::RemovePassword);
 }
 
 QString nonNull(const QString &value)
@@ -169,6 +186,39 @@ QString MomentRepository::resolvedPlayablePath(
     }
 
     return normalizedReadablePath(moment.sourcePath);
+}
+
+QUrl MomentRepository::resolvedPlayableUrl(
+    const MomentRecord &moment) const
+{
+    if (m_database.tables().contains(QStringLiteral("track_sources"))) {
+        QSqlQuery query(m_database);
+        query.prepare(QStringLiteral(
+            "SELECT file_path FROM track_sources "
+            "WHERE track_id = ? AND availability = 'Available' "
+            "ORDER BY COALESCE(last_verified_at, '') DESC, "
+            "COALESCE(updated_at, '') DESC, file_path ASC, source_id ASC "
+            "LIMIT 1"));
+        query.addBindValue(moment.trackId);
+
+        if (query.exec() && query.next()) {
+            const QString source = query.value(0).toString();
+            const QUrl url = networkAudioUrl(source);
+            if (!url.isEmpty())
+                return url;
+
+            const QString activePath = normalizedReadablePath(source);
+            if (!activePath.isEmpty())
+                return QUrl::fromLocalFile(activePath);
+        }
+    }
+
+    const QUrl storedUrl = networkAudioUrl(moment.sourcePath);
+    if (!storedUrl.isEmpty())
+        return storedUrl;
+
+    const QString path = resolvedPlayablePath(moment);
+    return path.isEmpty() ? QUrl() : QUrl::fromLocalFile(path);
 }
 
 bool MomentRepository::initializeSchema()

@@ -26,6 +26,48 @@ QString normalizedPath(const QString &path)
     return canonical.isEmpty() ? info.absoluteFilePath() : canonical;
 }
 
+bool isNetworkAudioUrl(const QUrl &url)
+{
+    const QString scheme = url.scheme().toCaseFolded();
+    return (scheme == QStringLiteral("http") || scheme == QStringLiteral("https"))
+        && !url.host().isEmpty();
+}
+
+QUrl normalizedNetworkAudioUrl(const QUrl &source)
+{
+    if (!isNetworkAudioUrl(source))
+        return {};
+
+    return source.adjusted(QUrl::NormalizePathSegments | QUrl::RemovePassword);
+}
+
+QString normalizedMomentSource(const QUrl &source)
+{
+    if (source.isLocalFile())
+        return normalizedPath(source.toLocalFile());
+
+    const QUrl networkUrl = normalizedNetworkAudioUrl(source);
+    return networkUrl.isEmpty()
+        ? QString()
+        : networkUrl.toString(QUrl::RemovePassword);
+}
+
+QString titleFallbackForSource(
+    const QUrl &source,
+    const QString &storedSource)
+{
+    if (source.isLocalFile())
+        return QFileInfo(source.toLocalFile()).completeBaseName();
+
+    const QUrl networkUrl = normalizedNetworkAudioUrl(source);
+    if (!networkUrl.isEmpty()) {
+        const QString sourceName = QFileInfo(networkUrl.path()).completeBaseName();
+        return sourceName.isEmpty() ? networkUrl.host() : sourceName;
+    }
+
+    return QFileInfo(storedSource).completeBaseName();
+}
+
 QColor resolvedColor(const QString &value)
 {
     const QColor color(value);
@@ -115,14 +157,12 @@ QString MomentService::latestConfirmedMeaning() const
 
 bool MomentService::latestAvailable() const
 {
-    return !m_latestPlayablePath.isEmpty();
+    return !m_latestPlayableUrl.isEmpty();
 }
 
 QUrl MomentService::latestUrl() const
 {
-    return latestAvailable()
-        ? QUrl::fromLocalFile(m_latestPlayablePath)
-        : QUrl();
+    return m_latestPlayableUrl;
 }
 
 QString MomentService::selectedMomentId() const
@@ -191,14 +231,12 @@ QString MomentService::selectedCreatedLabel() const
 
 bool MomentService::selectedAvailable() const
 {
-    return !m_selectedPlayablePath.isEmpty();
+    return !m_selectedPlayableUrl.isEmpty();
 }
 
 QUrl MomentService::selectedUrl() const
 {
-    return selectedAvailable()
-        ? QUrl::fromLocalFile(m_selectedPlayablePath)
-        : QUrl();
+    return m_selectedPlayableUrl;
 }
 
 QString MomentService::lastStatus() const
@@ -214,7 +252,7 @@ QString MomentService::errorString() const
 bool MomentService::keepCurrentMoment(
     const QString &trackId,
     const QString &sourceId,
-    const QString &filePath,
+    const QUrl &sourceUrl,
     const QString &title,
     const QString &artist,
     const QString &album,
@@ -222,8 +260,9 @@ bool MomentService::keepCurrentMoment(
     const QColor &identityColor,
     const QString &confirmedMeaning)
 {
-    if (trackId.trimmed().isEmpty() || filePath.trimmed().isEmpty()) {
-        setErrorString(tr("Load a local track before keeping a moment."));
+    const QString storedSource = normalizedMomentSource(sourceUrl);
+    if (trackId.trimmed().isEmpty() || storedSource.isEmpty()) {
+        setErrorString(tr("Load a track before keeping a moment."));
         return false;
     }
 
@@ -234,9 +273,9 @@ bool MomentService::keepCurrentMoment(
         QUuid::createUuid().toString(QUuid::Id128));
     moment.trackId = trackId;
     moment.sourceId = sourceId;
-    moment.sourcePath = normalizedPath(filePath);
+    moment.sourcePath = storedSource;
     moment.title = title.trimmed().isEmpty()
-        ? QFileInfo(filePath).completeBaseName()
+        ? titleFallbackForSource(sourceUrl, storedSource)
         : title.trimmed();
     moment.artist = artist.trimmed();
     moment.album = album.trimmed();
@@ -271,7 +310,7 @@ bool MomentService::selectMoment(const QString &momentId)
     setErrorString({});
     setSelectedMoment(
         selected,
-        m_repository.resolvedPlayablePath(*selected));
+        m_repository.resolvedPlayableUrl(*selected));
     return true;
 }
 
@@ -304,44 +343,44 @@ void MomentService::refresh()
     for (const MomentRecord &moment : records) {
         items.append(momentItem(
             moment,
-            m_repository.resolvedPlayablePath(moment)));
+            m_repository.resolvedPlayableUrl(moment)));
     }
 
     const std::optional<MomentRecord> latest =
         records.isEmpty()
         ? std::optional<MomentRecord> {}
         : std::optional<MomentRecord> { records.first() };
-    const QString latestPath = latest
-        ? m_repository.resolvedPlayablePath(*latest)
-        : QString();
+    const QUrl latestUrl = latest
+        ? m_repository.resolvedPlayableUrl(*latest)
+        : QUrl();
 
     const bool collectionChanged =
         m_momentCount != records.size()
         || m_momentItems != items
-        || m_latestPlayablePath != latestPath;
+        || m_latestPlayableUrl != latestUrl;
 
     m_moments = records;
     m_momentCount = records.size();
     m_momentItems = items;
     m_latestMoment = latest;
-    m_latestPlayablePath = latestPath;
+    m_latestPlayableUrl = latestUrl;
 
     std::optional<MomentRecord> selected;
-    QString selectedPath;
+    QUrl selectedUrl;
     for (const MomentRecord &moment : records) {
         if (moment.momentId == previousSelectedId) {
             selected = moment;
-            selectedPath = m_repository.resolvedPlayablePath(moment);
+            selectedUrl = m_repository.resolvedPlayableUrl(moment);
             break;
         }
     }
 
     if (!selected && latest) {
         selected = latest;
-        selectedPath = latestPath;
+        selectedUrl = latestUrl;
     }
 
-    setSelectedMoment(selected, selectedPath);
+    setSelectedMoment(selected, selectedUrl);
 
     if (collectionChanged)
         emit momentsChanged();
@@ -378,7 +417,7 @@ QString MomentService::headingForPeriod(const QString &period) const
 
 QVariantMap MomentService::momentItem(
     const MomentRecord &moment,
-    const QString &resolvedPlayablePath) const
+    const QUrl &resolvedPlayableUrl) const
 {
     QVariantMap item;
     item.insert(QStringLiteral("momentId"), moment.momentId);
@@ -397,28 +436,25 @@ QVariantMap MomentService::momentItem(
                 moment.createdAt.toLocalTime().toString(
                     QStringLiteral("MMM d · h:mm AP")));
     item.insert(QStringLiteral("available"),
-                !resolvedPlayablePath.isEmpty());
-    item.insert(QStringLiteral("url"),
-                resolvedPlayablePath.isEmpty()
-                    ? QUrl()
-                    : QUrl::fromLocalFile(resolvedPlayablePath));
+                !resolvedPlayableUrl.isEmpty());
+    item.insert(QStringLiteral("url"), resolvedPlayableUrl);
     return item;
 }
 
 void MomentService::setSelectedMoment(
     const std::optional<MomentRecord> &moment,
-    const QString &resolvedPlayablePath)
+    const QUrl &resolvedPlayableUrl)
 {
     const QString oldId = selectedMomentId();
     const QString oldMeaning = selectedConfirmedMeaning();
-    const QString oldPath = m_selectedPlayablePath;
+    const QUrl oldUrl = m_selectedPlayableUrl;
 
     m_selectedMoment = moment;
-    m_selectedPlayablePath = resolvedPlayablePath;
+    m_selectedPlayableUrl = resolvedPlayableUrl;
 
     if (oldId != selectedMomentId()
         || oldMeaning != selectedConfirmedMeaning()
-        || oldPath != m_selectedPlayablePath) {
+        || oldUrl != m_selectedPlayableUrl) {
         emit selectionChanged();
     }
 }

@@ -59,7 +59,13 @@ Item {
         transitionArtist = Moments.selectedArtist
         transitionArtworkSource = Moments.selectedArtworkSource
         transitionIdentityColor = Moments.selectedIdentityColor
-        AudioRuntime.setQueue([Moments.selectedUrl])
+        AudioRuntime.setQueueWithMetadata([{
+            url: Moments.selectedUrl,
+            title: Moments.selectedTitle,
+            artist: Moments.selectedArtist,
+            album: Moments.selectedAlbum,
+            artworkUrl: Moments.selectedArtworkSource
+        }])
 
         transitionOriginPage = originPage
         musicReturnPage = originPage

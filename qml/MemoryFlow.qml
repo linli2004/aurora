@@ -127,8 +127,8 @@ Item {
            : (root.width - width) / 2
         anchors.verticalCenter: parent.verticalCenter
         sizePreset: root.width < 1080 ? 0 : 1
-        title: Moments.selectedHeading
-        periodLabel: Moments.selectedPeriodLabel
+        title: AuroraI18n.momentHeading(Moments.selectedHeading)
+        periodLabel: AuroraI18n.momentPeriod(Moments.selectedPeriodLabel)
         trackTitle: Moments.selectedTitle
         artist: Moments.selectedArtist
         artworkSource: Moments.selectedArtworkSource
@@ -370,7 +370,8 @@ Item {
                             width: parent.width
                             text: modelData.confirmedMeaning.length > 0
                                   ? modelData.confirmedMeaning
-                                  : modelData.heading + " · " + modelData.artist
+                                  : AuroraI18n.momentHeading(modelData.heading)
+                                    + " · " + modelData.artist
                             color: AuroraTokens.mangaMuted
                             font.pixelSize: 10
                             elide: Text.ElideRight
