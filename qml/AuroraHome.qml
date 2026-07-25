@@ -8,6 +8,10 @@ Item {
     property int qualityMode: AuroraTypes.Balanced
     property bool identityVisible: true
     property bool transitioning: false
+    readonly property bool showingLatestMoment:
+        Moments.hasMoment
+        && (!AudioRuntime.hasTrack
+            || Moments.latestTrackId === AudioRuntime.trackId)
     readonly property string homeArtistLine:
         AudioRuntime.artist === "Local audio" ? "" : AudioRuntime.artist
 
@@ -69,8 +73,10 @@ Item {
         }
 
         Text {
-            text: Moments.hasMoment
+            text: root.showingLatestMoment
                   ? Moments.latestHeading
+                  : AudioRuntime.hasTrack
+                    ? AuroraI18n.text("home.currentSession")
                   : AuroraI18n.text("home.begin")
             color: AuroraTokens.mangaInk
             font.pixelSize: Math.max(34, root.width * 0.045)
@@ -91,11 +97,13 @@ Item {
 
                 anchors.fill: parent
                 anchors.margins: 12
-                text: Moments.hasMoment
+                text: root.showingLatestMoment
                       ? (Moments.latestConfirmedMeaning.length > 0
                          ? "「" + Moments.latestConfirmedMeaning + "」"
                          : Moments.latestTitle + " · " + Moments.latestArtist)
-                      : AuroraI18n.text("home.beginNote")
+                      : AudioRuntime.hasTrack
+                        ? AudioRuntime.title + " · " + root.homeArtistLine
+                        : AuroraI18n.text("home.beginNote")
                 color: AuroraTokens.mangaMuted
                 font.pixelSize: 16
                 wrapMode: Text.Wrap
@@ -107,45 +115,45 @@ Item {
         id: currentMoment
         anchors.centerIn: parent
         sizePreset: root.width < 980 ? 0 : 1
-        title: Moments.hasMoment
+        title: root.showingLatestMoment
                ? Moments.latestHeading
                : AudioRuntime.hasTrack
                  ? AuroraI18n.text("home.currentSession")
                  : AuroraI18n.text("home.latestFallback")
-        periodLabel: Moments.hasMoment
+        periodLabel: root.showingLatestMoment
                      ? Moments.latestPeriodLabel
                      : AudioRuntime.hasTrack
                        ? AuroraI18n.text("home.now")
                        : AuroraI18n.text("home.lateNight")
-        trackTitle: Moments.hasMoment
+        trackTitle: root.showingLatestMoment
                     ? Moments.latestTitle
                     : AudioRuntime.hasTrack
                       ? AudioRuntime.title
                       : AuroraI18n.text("demo.track")
-        artist: Moments.hasMoment
+        artist: root.showingLatestMoment
                 ? Moments.latestArtist
                 : AudioRuntime.hasTrack
                   ? root.homeArtistLine
                   : AuroraI18n.text("demo.artist")
-        artworkSource: Moments.hasMoment
+        artworkSource: root.showingLatestMoment
                        ? Moments.latestArtworkSource
                        : AudioRuntime.hasTrack
                          ? AudioRuntime.artworkSource
                          : "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
-        emotionColor: Moments.hasMoment
+        emotionColor: root.showingLatestMoment
                       ? Moments.latestIdentityColor
                       : AudioRuntime.hasTrack && AudioRuntime.identityColorAvailable
                         ? AudioRuntime.identityColor
                         : AuroraTokens.coolAccent
-        confirmedUserNote: Moments.hasMoment
+        confirmedUserNote: root.showingLatestMoment
                            ? Moments.latestConfirmedMeaning
                            : ""
-        availability: Moments.hasMoment && !Moments.latestAvailable
+        availability: root.showingLatestMoment && !Moments.latestAvailable
                       ? AuroraTypes.AvailabilityDetached
                       : AuroraTypes.AvailabilityActive
         experienceState: root.transitioning
                          ? AuroraTypes.MomentRecalling
-                         : Moments.hasMoment
+                         : root.showingLatestMoment
                            ? Moments.latestAvailable
                              ? Moments.latestConfirmedMeaning.length > 0
                                ? AuroraTypes.MomentMeaningful
@@ -159,13 +167,13 @@ Item {
         qualityMode: root.qualityMode
         mangaMode: true
         onActivated: {
-            if (Moments.hasMoment)
+            if (root.showingLatestMoment)
                 root.recallLatestMoment()
             else
                 root.openMusicSpace()
         }
         onRecallRequested: {
-            if (Moments.hasMoment)
+            if (root.showingLatestMoment)
                 root.recallLatestMoment()
             else
                 root.openMusicSpace()

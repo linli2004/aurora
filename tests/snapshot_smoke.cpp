@@ -191,6 +191,23 @@ int main(int argc, char *argv[])
             }
         }
 
+        if (mode == QStringLiteral("home-online-current")) {
+            const QString demoPath =
+                QDir::temp().filePath(QStringLiteral("aurora-snapshot-online.wav"));
+            if (!ensureDemoAudioFile(demoPath))
+                QCoreApplication::exit(EXIT_FAILURE);
+
+            QVariantMap track;
+            track.insert(QStringLiteral("url"), QUrl::fromLocalFile(demoPath));
+            track.insert(QStringLiteral("title"), QStringLiteral("線上曲目測試"));
+            track.insert(QStringLiteral("artist"), QStringLiteral("Source Catalog"));
+            track.insert(QStringLiteral("album"), QStringLiteral("Online Demo"));
+            audioRuntime.setQueueWithMetadata({track});
+
+            if (QQuickItem *shell = findAppShell(window))
+                shell->setProperty("currentPage", 0);
+        }
+
         const int settleDelay = mode == QStringLiteral("music-presence") ? 4700 : 900;
         QTimer::singleShot(settleDelay, &app, [&app, window, outputPath]() {
             const QImage image = window->grabWindow();
