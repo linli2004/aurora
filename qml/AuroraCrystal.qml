@@ -56,6 +56,8 @@ FocusScope {
         reactiveEnabled ? Math.max(0, Math.min(1, transientEnergy)) : 0.0
     readonly property real audioPulse:
         heroMode ? level * 0.012 + bass * 0.035 + transientLevel * 0.030 : 0.0
+    readonly property real ambientLift:
+        heroMode && motionEnabled ? Math.sin(ambientPhase * 0.72) * 3.0 : 0.0
 
     property real ambientPhase: 0.0
 
@@ -68,6 +70,7 @@ FocusScope {
               : heroMode && motionEnabled
                 ? Math.sin(ambientPhase * 0.42) * 0.8 + transientLevel * 0.45
                 : 0
+    transform: Translate { y: root.ambientLift }
     activeFocusOnTab: detached
     Accessible.role: detached ? Accessible.Button : Accessible.Graphic
     Accessible.name: detached ? "Relink music source for " + title : title + " by " + artist
@@ -94,12 +97,46 @@ FocusScope {
         running: root.heroMode && root.motionEnabled
     }
 
+    Repeater {
+        model: root.heroMode && root.qualityMode !== AuroraTypes.Eco ? 3 : 0
+
+        delegate: Rectangle {
+            required property int index
+
+            anchors.centerIn: parent
+            width: parent.width * (1.08 + index * 0.10)
+            height: width
+            radius: width * (0.26 + index * 0.015)
+            color: "transparent"
+            border.width: index === 0 ? 2 : 1
+            border.color: root.mangaMode
+                          ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                    AuroraTokens.mangaInk.g,
+                                    AuroraTokens.mangaInk.b,
+                                    0.10 + root.high * (0.10 - index * 0.018))
+                          : Qt.rgba(root.colorSignature.r,
+                                    root.colorSignature.g,
+                                    root.colorSignature.b,
+                                    0.10 + root.high * (0.10 - index * 0.018))
+            rotation: (index % 2 === 0 ? -1 : 1)
+                      * (8 + index * 5)
+                      + (root.motionEnabled
+                         ? Math.sin(root.ambientPhase * (0.40 + index * 0.08))
+                           * (2.0 + index)
+                         : 0)
+            scale: 1.0
+                   + root.bass * (0.012 + index * 0.009)
+                   + root.transientLevel * (0.010 + index * 0.008)
+            opacity: 0.60 - index * 0.12
+        }
+    }
+
     Rectangle {
         visible: root.heroMode
         anchors.centerIn: parent
-        width: parent.width * (1.18 + root.bass * 0.08)
-        height: parent.height * (1.18 + root.bass * 0.08)
-        radius: width * 0.22
+        width: parent.width * (1.22 + root.bass * 0.08)
+        height: parent.height * (1.22 + root.bass * 0.08)
+        radius: width * 0.28
         color: Qt.rgba(root.colorSignature.r,
                        root.colorSignature.g,
                        root.colorSignature.b,
@@ -112,8 +149,8 @@ FocusScope {
     Rectangle {
         id: identitySurface
         anchors.fill: parent
-        radius: width * (root.heroMode ? 0.22 : 0.10)
-        opacity: root.heroMode ? 0.92 : 1.0
+        radius: width * (root.heroMode ? 0.28 : 0.10)
+        opacity: root.heroMode ? 0.96 : 1.0
         color: root.mangaMode
                ? Qt.rgba(root.colorSignature.r,
                          root.colorSignature.g,
@@ -126,7 +163,7 @@ FocusScope {
                          0.26)
                : Qt.darker(root.colorSignature, 1.5)
         border.width: root.mangaMode
-                      ? (root.activeFocus ? 4 : 3)
+                      ? (root.activeFocus ? 4 : root.heroMode ? 2 : 3)
                       : root.activeFocus ? 3 : (root.heroMode ? 0 : root.transitioning ? 2 : 1)
         border.color: root.activeFocus
                       ? AuroraTokens.focusRing
@@ -183,7 +220,7 @@ FocusScope {
         }
 
         Repeater {
-            model: root.heroMode && root.mangaMode ? 12 : 0
+            model: root.heroMode && root.mangaMode ? 8 : 0
 
             delegate: Rectangle {
                 required property int index
@@ -195,7 +232,7 @@ FocusScope {
                 y: parent.height * (0.12 + index * 0.060)
                 rotation: -20
                 color: AuroraTokens.mangaInk
-                opacity: 0.045 + root.high * 0.060
+                opacity: 0.030 + root.high * 0.045
             }
         }
 
@@ -277,6 +314,23 @@ FocusScope {
                 font.weight: Font.DemiBold
                 horizontalAlignment: Text.AlignHCenter
             }
+        }
+
+        Rectangle {
+            visible: root.heroMode && root.qualityMode !== AuroraTypes.Eco
+            width: parent.width * 0.82
+            height: parent.height * 0.10
+            x: parent.width * 0.02
+            y: parent.height * 0.18
+            radius: height / 2
+            rotation: -24 + root.mid * 5
+            color: root.mangaMode
+                   ? Qt.rgba(AuroraTokens.mangaPaper.r,
+                             AuroraTokens.mangaPaper.g,
+                             AuroraTokens.mangaPaper.b,
+                             0.10 + root.high * 0.06)
+                   : Qt.rgba(1, 1, 1, 0.08 + root.high * 0.07)
+            opacity: 0.55 + root.level * 0.18
         }
 
         Rectangle {

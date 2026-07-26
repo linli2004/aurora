@@ -20,6 +20,7 @@ Item {
     property bool momentFeedbackVisible: false
     property bool appendResolvedSource: false
     property bool transitionCrystalSettling: false
+    property real presencePhase: 0.0
 
     readonly property string displayTitle:
         AudioRuntime.hasTrack ? AudioRuntime.title : AuroraI18n.text("demo.track")
@@ -47,6 +48,14 @@ Item {
         || root.tracksPanelExpanded
         || root.sourcePanelExpanded
     readonly property real controlOpacity: root.controlsVisible ? 1.0 : 0.0
+    readonly property bool reducedMotion:
+        root.accessibilityMode === AuroraTypes.AccessibilityReducedMotion
+    readonly property real visualPresence:
+        Math.max(0.0, Math.min(1.0,
+            (AudioRuntime.hasTrack ? 0.38 : 0.18)
+            + (AudioRuntime.playing ? 0.18 : 0.0)
+            + AudioRuntime.audioLevel * 0.28
+            + AudioRuntime.bassEnergy * 0.12))
     readonly property bool emptyMusicPromptVisible:
         !AudioRuntime.hasTrack
         && LocalLibrary.trackCount === 0
@@ -194,6 +203,14 @@ Item {
         liquidTrackTransition.start(direction)
     }
 
+    NumberAnimation on presencePhase {
+        from: 0.0
+        to: Math.PI * 2.0
+        duration: 18000
+        loops: Animation.Infinite
+        running: root.visible && !root.reducedMotion
+    }
+
     focus: visible
     Keys.onSpacePressed: {
         root.revealControls()
@@ -276,7 +293,7 @@ Item {
 
     Timer {
         id: controlHideTimer
-        interval: 4000
+        interval: 3200
         repeat: false
         onTriggered: {
             if (!root.forceControlsVisible
@@ -367,9 +384,9 @@ Item {
         anchors.fill: parent
         accentColor: root.displayIdentityColor
         secondaryColor: AuroraTokens.memoryAccent
-        energy: (AudioRuntime.playing ? 0.36 : AudioRuntime.hasTrack ? 0.22 : 0.15)
-                + AudioRuntime.audioLevel * 0.46
-                + AudioRuntime.transientEnergy * 0.18
+        energy: (AudioRuntime.playing ? 0.48 : AudioRuntime.hasTrack ? 0.30 : 0.16)
+                + AudioRuntime.audioLevel * 0.52
+                + AudioRuntime.transientEnergy * 0.22
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
     }
@@ -388,7 +405,9 @@ Item {
         highEnergy: AudioRuntime.highEnergy
         transientEnergy: AudioRuntime.transientEnergy
         paperMode: true
-        opacity: root.flowSceneEnabled ? 0.0 : 0.24
+        opacity: root.flowSceneEnabled
+                 ? 0.0
+                 : (root.controlsVisible ? 0.24 : 0.38)
 
         Behavior on opacity {
             NumberAnimation {
@@ -414,7 +433,9 @@ Item {
         highEnergy: AudioRuntime.highEnergy
         transientEnergy: AudioRuntime.transientEnergy
         paperMode: true
-        opacity: root.flowSceneEnabled ? 0.28 : 0.0
+        opacity: root.flowSceneEnabled
+                 ? (root.controlsVisible ? 0.34 : 0.50)
+                 : 0.0
 
         Behavior on opacity {
             NumberAnimation {
@@ -468,6 +489,72 @@ Item {
 
         Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
         Behavior on opacity { NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
+    }
+
+    Item {
+        id: presenceAura
+
+        anchors.centerIn: parent
+        anchors.verticalCenterOffset: root.controlsVisible ? -54 : -68
+        width: Math.min(root.width * 0.76, root.height * 1.02)
+        height: width
+        opacity: AudioRuntime.hasTrack
+                 ? (root.controlsVisible ? 0.44 : 0.74)
+                 : 0.22
+        scale: 1.0
+               + AudioRuntime.bassEnergy * 0.032
+               + AudioRuntime.transientEnergy * 0.018
+        rotation: root.reducedMotion
+                  ? 0
+                  : Math.sin(root.presencePhase * 0.42) * 2.4
+        Repeater {
+            model: 3
+
+            delegate: Rectangle {
+                required property int index
+
+                anchors.centerIn: parent
+                width: parent.width * (0.58 + index * 0.13)
+                height: width
+                radius: width * (0.22 + index * 0.018)
+                color: "transparent"
+                border.width: index === 0 ? 2 : 1
+                border.color: Qt.rgba(root.displayIdentityColor.r,
+                                      root.displayIdentityColor.g,
+                                      root.displayIdentityColor.b,
+                                      0.10
+                                      + root.visualPresence * (0.10 - index * 0.018)
+                                      + AudioRuntime.highEnergy * 0.08)
+                rotation: (index % 2 === 0 ? -1 : 1)
+                          * (7 + index * 5)
+                          + (root.reducedMotion
+                             ? 0
+                             : Math.sin(root.presencePhase * (0.34 + index * 0.07))
+                               * (2.0 + index))
+                scale: 1.0
+                       + AudioRuntime.bassEnergy * (0.020 + index * 0.012)
+                       + AudioRuntime.transientEnergy * (0.015 + index * 0.010)
+            }
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width * 0.48
+            height: width
+            radius: width / 2
+            color: Qt.rgba(root.displayIdentityColor.r,
+                           root.displayIdentityColor.g,
+                           root.displayIdentityColor.b,
+                           0.026 + root.visualPresence * 0.050)
+            scale: 1.0 + AudioRuntime.bassEnergy * 0.080
+        }
+
+        Behavior on opacity {
+            NumberAnimation { duration: 420; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+        }
     }
 
     Rectangle {
@@ -611,25 +698,42 @@ Item {
         Behavior on scale { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
     }
 
-    Text {
-        anchors.right: parent.right
-        anchors.rightMargin: 300
+    Rectangle {
+        anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
-        anchors.topMargin: 76
-        width: 124
-        horizontalAlignment: Text.AlignHCenter
-        text: Moments.errorString.length > 0
-              ? Moments.errorString
-              : Moments.lastStatus
-        color: Moments.errorString.length > 0
-               ? AuroraTokens.warmAccent
-               : root.mangaMutedText
-        font.pixelSize: 10
-        elide: Text.ElideRight
-        visible: text.length > 0 || root.momentFeedbackVisible
-        opacity: root.momentFeedbackVisible ? 1.0 : root.controlOpacity
+        anchors.topMargin: 28
+        width: Math.min(360, root.width - 56)
+        height: 42
+        visible: root.momentFeedbackVisible
+                 || (root.controlsVisible && Moments.errorString.length > 0)
+        opacity: visible ? 1.0 : 0.0
+        scale: visible ? 1.0 : 0.96
+        radius: 10
+        color: AuroraTokens.mangaPanel
+        border.width: 2
+        border.color: Moments.errorString.length > 0
+                      ? AuroraTokens.warmAccent
+                      : root.displayIdentityColor
+        z: 40
+
+        Text {
+            anchors.fill: parent
+            anchors.margins: 10
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            text: Moments.errorString.length > 0
+                  ? Moments.errorString
+                  : Moments.lastStatus
+            color: Moments.errorString.length > 0
+                   ? AuroraTokens.warmAccent
+                   : root.mangaText
+            font.pixelSize: 12
+            font.weight: Font.DemiBold
+            elide: Text.ElideRight
+        }
 
         Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
     }
 
     Rectangle {
@@ -1534,6 +1638,7 @@ Item {
     Column {
         id: playerContent
         anchors.centerIn: parent
+        anchors.verticalCenterOffset: root.controlsVisible ? -18 : -34
         opacity: !liquidTrackTransition.running
                  ? 1.0
                  : root.transitionLanding ? 1.0 : 0.02
@@ -1558,14 +1663,14 @@ Item {
                 easing.type: Easing.OutQuint
             }
         }
-        width: Math.min(parent.width * 0.72, 620)
-        spacing: root.controlsVisible ? 20 : 18
+        width: Math.min(parent.width * 0.78, root.controlsVisible ? 640 : 720)
+        spacing: root.controlsVisible ? 20 : 14
 
         AuroraCrystal {
             id: mainCrystal
             anchors.horizontalCenter: parent.horizontalCenter
-            crystalSize: Math.min(root.controlsVisible ? 410 : 500,
-                                  Math.max(280, root.height * (root.controlsVisible ? 0.42 : 0.54)))
+            crystalSize: Math.min(root.controlsVisible ? 410 : 560,
+                                  Math.max(300, root.height * (root.controlsVisible ? 0.42 : 0.60)))
             title: root.displayTitle
             artist: root.displayArtist
             artworkSource: AudioRuntime.hasTrack
@@ -1609,8 +1714,8 @@ Item {
                 elide: Text.ElideRight
                 text: root.displayTitle
                 color: root.mangaText
-                opacity: root.controlsVisible ? 1.0 : 0.76
-                font.pixelSize: root.controlsVisible ? 28 : 23
+                opacity: root.controlsVisible ? 1.0 : 0.92
+                font.pixelSize: root.controlsVisible ? 28 : 30
                 font.weight: Font.DemiBold
             }
 
@@ -1630,8 +1735,8 @@ Item {
                            ? (AudioRuntime.currentIndex + 1) + "/" + AudioRuntime.queueCount
                          : "")
                 color: root.mangaMutedText
-                opacity: root.controlsVisible ? 1.0 : 0.62
-                font.pixelSize: 14
+                opacity: root.controlsVisible ? 1.0 : 0.72
+                font.pixelSize: root.controlsVisible ? 14 : 15
             }
 
             Text {
@@ -1674,12 +1779,14 @@ Item {
                 id: progressTrack
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.leftMargin: 48
-                anchors.rightMargin: 48
+                anchors.leftMargin: root.controlsVisible ? 48 : 150
+                anchors.rightMargin: root.controlsVisible ? 48 : 150
                 anchors.verticalCenter: parent.verticalCenter
-                height: 5
-                radius: 3
-                opacity: root.controlOpacity
+                height: root.controlsVisible ? 5 : 2
+                radius: height / 2
+                opacity: root.controlsVisible
+                         ? 1.0
+                         : AudioRuntime.hasTrack ? 0.48 : 0.0
                 color: Qt.rgba(AuroraTokens.mangaInk.r,
                                AuroraTokens.mangaInk.g,
                                AuroraTokens.mangaInk.b,
@@ -1747,14 +1854,14 @@ Item {
 
             AuroraCore {
                 anchors.verticalCenter: parent.verticalCenter
-                diameter: root.controlsVisible ? 90 : 76
+                diameter: root.controlsVisible ? 90 : 66
                 experienceState: root.transitioning || liquidTrackTransition.running
                                  ? AuroraTypes.CoreGathering
                                  : AudioRuntime.coreExperienceState
                 context: AuroraTypes.MusicSpace
                 presenceLevel: root.controlsVisible
                                ? (AudioRuntime.playing ? 0.72 : AudioRuntime.hasTrack ? 0.38 : 0.24)
-                               : (AudioRuntime.playing ? 0.48 : AudioRuntime.hasTrack ? 0.26 : 0.18)
+                               : (AudioRuntime.playing ? 0.42 : AudioRuntime.hasTrack ? 0.24 : 0.16)
                 accessibilityMode: root.accessibilityMode
                 qualityMode: root.qualityMode
                 onRequestPlayPause: {
