@@ -8,6 +8,7 @@ Item {
     property int qualityMode: AuroraTypes.Balanced
     property bool identityVisible: true
     property bool transitioning: false
+    property real entryPhase: 0.0
 
     readonly property bool showingLatestMoment:
         Moments.hasMoment
@@ -62,6 +63,17 @@ Item {
         return Qt.rect(origin.x, origin.y, size, size)
     }
 
+
+    NumberAnimation on entryPhase {
+        from: 0.0
+        to: Math.PI * 2.0
+        duration: 5200
+        loops: Animation.Infinite
+        running: root.visible
+                 && !root.transitioning
+                 && root.accessibilityMode === AuroraTypes.AccessibilityNormal
+    }
+
     MangaBackdrop {
         anchors.fill: parent
         accentColor: root.homeIdentityColor
@@ -104,7 +116,7 @@ Item {
                               AuroraTokens.mangaInk.g,
                               AuroraTokens.mangaInk.b,
                               0.08)
-        opacity: root.transitioning ? 0.0 : 1.0
+        opacity: root.transitioning ? 0.0 : 0.68
 
         Behavior on opacity {
             NumberAnimation {
@@ -245,15 +257,31 @@ Item {
         onRelinkRequested: root.openMusicSpace()
     }
 
-    Text {
+    Item {
         anchors.horizontalCenter: currentMoment.horizontalCenter
         anchors.top: currentMoment.bottom
-        anchors.topMargin: -28
-        text: root.homePeriod
-        color: AuroraTokens.mangaMuted
+        anchors.topMargin: -24
+        width: 96
+        height: 44
         opacity: root.transitioning ? 0.0 : 0.72
-        font.pixelSize: 13
-        font.letterSpacing: 1.2
+
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            width: 1
+            height: 18 + Math.sin(root.entryPhase) * 3
+            color: root.homeIdentityColor
+            opacity: 0.62
+        }
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            text: "↗"
+            color: AuroraTokens.mangaInk
+            font.pixelSize: 17
+            rotation: Math.sin(root.entryPhase * 0.7) * 2
+        }
 
         Behavior on opacity {
             NumberAnimation {

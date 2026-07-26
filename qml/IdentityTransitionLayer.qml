@@ -39,7 +39,7 @@ Item {
         progressAnimation.to = 1.0
         progressAnimation.duration = reducedMotion
                                      ? AuroraTokens.motionSoft
-                                     : 1120
+                                     : 1280
         progressAnimation.start()
     }
 
@@ -50,7 +50,7 @@ Item {
         progressAnimation.to = 0.0
         progressAnimation.duration = reducedMotion
                                      ? AuroraTokens.motionSoft
-                                     : 900
+                                     : 980
         progressAnimation.start()
     }
 
@@ -60,8 +60,38 @@ Item {
         opacity: root.reducedMotion ? 0.0 : root.transitionPulse * 0.075
     }
 
+    Item {
+        anchors.fill: parent
+        visible: !root.reducedMotion
+        opacity: root.transitionPulse * 0.72
+
+        Rectangle {
+            width: parent.width * 0.58
+            height: parent.height * 1.35
+            x: -width * (0.58 - root.progress * 0.22)
+            y: -parent.height * 0.16
+            rotation: -12
+            color: Qt.rgba(root.colorSignature.r,
+                           root.colorSignature.g,
+                           root.colorSignature.b,
+                           0.055)
+        }
+
+        Rectangle {
+            width: parent.width * 0.52
+            height: parent.height * 1.28
+            x: parent.width - width * (0.42 + root.progress * 0.18)
+            y: -parent.height * 0.10
+            rotation: 11
+            color: Qt.rgba(AuroraTokens.memoryAccent.r,
+                           AuroraTokens.memoryAccent.g,
+                           AuroraTokens.memoryAccent.b,
+                           0.038)
+        }
+    }
+
     Repeater {
-        model: root.reducedMotion || root.qualityMode === AuroraTypes.Eco ? 1 : 3
+        model: root.reducedMotion || root.qualityMode === AuroraTypes.Eco ? 1 : 2
 
         delegate: Rectangle {
             required property int index
@@ -132,6 +162,44 @@ Item {
         rotation: root.reducedMotion
                   ? 0
                   : -1.2 + root.progress * 2.4
+    }
+
+    Column {
+        anchors.left: parent.left
+        anchors.leftMargin: Math.max(42, parent.width * 0.08)
+        anchors.verticalCenter: parent.verticalCenter
+        width: Math.min(360, parent.width * 0.32)
+        spacing: 7
+        opacity: root.reducedMotion
+                 ? 0.0
+                 : root.transitionPulse * Math.min(1.0, root.progress * 3.0)
+        visible: opacity > 0.01
+
+        Rectangle {
+            width: Math.min(128, parent.width * 0.42)
+            height: 3
+            radius: 2
+            color: root.colorSignature
+        }
+
+        Text {
+            width: parent.width
+            text: root.title
+            color: AuroraTokens.mangaInk
+            font.pixelSize: 32
+            font.weight: Font.DemiBold
+            wrapMode: Text.Wrap
+            maximumLineCount: 2
+            elide: Text.ElideRight
+        }
+
+        Text {
+            width: parent.width
+            text: root.artist
+            color: AuroraTokens.mangaMuted
+            font.pixelSize: 14
+            elide: Text.ElideRight
+        }
     }
 
     NumberAnimation {

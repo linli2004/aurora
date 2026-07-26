@@ -113,7 +113,7 @@ Item {
         opacity: identityTransitionRunning
                  && root.transitionOriginPage === 0
                  ? Math.max(0.0,
-                            1.0 - identityTransition.progress / 0.58)
+                            1.0 - identityTransition.progress / 0.44)
                  : root.currentPage === 0 ? 1.0 : 0.0
         identityVisible: !(identityTransitionRunning
                            && root.transitionOriginPage === 0)
@@ -147,7 +147,7 @@ Item {
         opacity: identityTransitionRunning
                  ? Math.max(0.0,
                             Math.min(1.0,
-                                     (identityTransition.progress - 0.30) / 0.70))
+                                     (identityTransition.progress - 0.46) / 0.54))
                  : root.currentPage === 1 ? 1.0 : 0.0
         identityVisible: !identityTransitionRunning
         transitioning: identityTransitionRunning
@@ -194,7 +194,7 @@ Item {
         opacity: identityTransitionRunning
                  && root.transitionOriginPage === 3
                  ? Math.max(0.0,
-                            1.0 - identityTransition.progress / 0.58)
+                            1.0 - identityTransition.progress / 0.44)
                  : root.currentPage === 3 ? 1.0 : 0.0
         identityVisible: !(identityTransitionRunning
                            && root.transitionOriginPage === 3)
