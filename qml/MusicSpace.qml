@@ -78,17 +78,21 @@ Item {
         && AudioRuntime.trackId.length > 0
         && AudioRuntime.source.toString().length > 0
     readonly property string sourcePanelStatus:
-        MusicSources.busy
-        ? AuroraI18n.text("music.sourceImporting")
-        : MusicSources.resolving
-          ? AuroraI18n.text("music.sourceResolving")
+        MusicSources.busy || MusicSources.resolving
+        ? AuroraI18n.text("music.sourceStatusWorking")
         : MusicSources.errorString.length > 0
-          ? MusicSources.errorString
+          ? AuroraI18n.text("music.sourceStatusFailure")
           : MusicSources.sourceCount > 0
-            ? AuroraI18n.text("music.sourceConnected")
-              + " " + MusicSources.sourceCount
-              + " · " + MusicSources.sourceNames.join(" / ")
-            : AuroraI18n.text("music.sourceEmpty")
+            ? AuroraI18n.text("music.sourceStatusReady")
+              + " · " + MusicSources.sourceCount
+              + " · " + MusicSources.onlineTrackCount
+              + " " + AuroraI18n.text("music.onlineTracksReady")
+            : AuroraI18n.text("music.sourceStatusEmpty")
+    readonly property string playbackTrustLabel:
+        AudioRuntime.source.toString().startsWith("http://")
+        || AudioRuntime.source.toString().startsWith("https://")
+        ? AuroraI18n.text("music.onlineBadge")
+        : AuroraI18n.text("music.localBadge")
     readonly property color mangaButtonFill: AuroraTokens.mangaPanel
     readonly property color mangaButtonBorder: AuroraTokens.mangaInk
     readonly property color mangaText: AuroraTokens.mangaInk
@@ -854,15 +858,15 @@ Item {
         id: sourceButton
 
         anchors.right: parent.right
-        anchors.rightMargin: 164
+        anchors.rightMargin: 174
         anchors.top: parent.top
         anchors.topMargin: 28
-        width: 112
+        width: 132
         height: 42
         enabled: root.controlsVisible
         opacity: root.controlOpacity
         scale: 0.965 + root.controlOpacity * 0.035
-        radius: 8
+        radius: 21
         color: root.sourcePanelExpanded
                ? Qt.rgba(root.displayIdentityColor.r,
                          root.displayIdentityColor.g,
@@ -876,63 +880,213 @@ Item {
         Text {
             anchors.centerIn: parent
             text: AuroraI18n.text("music.source")
+                  + (MusicSources.sourceCount > 0
+                     ? " · " + MusicSources.sourceCount
+                     : "")
             color: root.mangaText
-            font.pixelSize: 13
+            font.pixelSize: 12
             font.weight: Font.DemiBold
         }
 
-        TapHandler { onTapped: root.sourcePanelExpanded = !root.sourcePanelExpanded }
+        TapHandler {
+            onTapped: root.sourcePanelExpanded = !root.sourcePanelExpanded
+        }
 
-        Behavior on opacity { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
-        Behavior on scale { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 320
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Behavior on scale {
+            NumberAnimation {
+                duration: 320
+                easing.type: Easing.OutCubic
+            }
+        }
     }
 
     Rectangle {
+        id: sourceStudioPanel
+
         anchors.right: parent.right
         anchors.rightMargin: 28
         anchors.top: sourceButton.bottom
         anchors.topMargin: 10
-        width: Math.min(430, root.width - 56)
-        height: 250
+        width: Math.min(486, root.width - 56)
+        height: Math.min(414, root.height - 112)
         visible: root.sourcePanelExpanded
+        enabled: root.sourcePanelExpanded
         opacity: root.sourcePanelExpanded ? 1.0 : 0.0
-        radius: 8
-        color: AuroraTokens.mangaPanel
+        radius: 14
+        color: Qt.rgba(AuroraTokens.mangaPanel.r,
+                       AuroraTokens.mangaPanel.g,
+                       AuroraTokens.mangaPanel.b,
+                       0.97)
         border.width: 2
         border.color: AuroraTokens.mangaInk
-        z: 20
+        z: 24
 
-        Behavior on opacity { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 240
+                easing.type: Easing.OutCubic
+            }
+        }
 
         Column {
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 9
+            anchors.margins: 16
+            spacing: 11
+
+            Row {
+                width: parent.width
+                height: 48
+                spacing: 10
+
+                Column {
+                    width: parent.width - 124
+                    spacing: 3
+
+                    Text {
+                        text: AuroraI18n.text("music.sourceStudio")
+                        color: root.mangaText
+                        font.pixelSize: 16
+                        font.weight: Font.DemiBold
+                    }
+
+                    Text {
+                        width: parent.width
+                        text: AuroraI18n.text("music.sourceStudioHint")
+                        color: root.mangaMutedText
+                        font.pixelSize: 10
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Rectangle {
+                    width: 114
+                    height: 34
+                    radius: 17
+                    color: Qt.rgba(root.displayIdentityColor.r,
+                                   root.displayIdentityColor.g,
+                                   root.displayIdentityColor.b,
+                                   0.10)
+                    border.width: 1
+                    border.color: Qt.rgba(root.displayIdentityColor.r,
+                                          root.displayIdentityColor.g,
+                                          root.displayIdentityColor.b,
+                                          0.42)
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: AuroraI18n.text("music.sourceTrustTitle")
+                        color: root.mangaText
+                        font.pixelSize: 10
+                        font.weight: Font.DemiBold
+                    }
+                }
+            }
+
+            Row {
+                width: parent.width
+                height: 56
+                spacing: 10
+
+                Rectangle {
+                    width: (parent.width - 10) * 0.5
+                    height: 56
+                    radius: 10
+                    color: AuroraTokens.mangaWash
+                    border.width: 1
+                    border.color: Qt.rgba(AuroraTokens.mangaInk.r,
+                                          AuroraTokens.mangaInk.g,
+                                          AuroraTokens.mangaInk.b,
+                                          0.24)
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 2
+
+                        Text {
+                            text: MusicSources.sourceCount
+                            color: root.mangaText
+                            font.pixelSize: 18
+                            font.weight: Font.DemiBold
+                        }
+
+                        Text {
+                            text: AuroraI18n.text("music.sourceConnected")
+                            color: root.mangaMutedText
+                            font.pixelSize: 9
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: (parent.width - 10) * 0.5
+                    height: 56
+                    radius: 10
+                    color: Qt.rgba(root.displayIdentityColor.r,
+                                   root.displayIdentityColor.g,
+                                   root.displayIdentityColor.b,
+                                   0.08)
+                    border.width: 1
+                    border.color: Qt.rgba(root.displayIdentityColor.r,
+                                          root.displayIdentityColor.g,
+                                          root.displayIdentityColor.b,
+                                          0.30)
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 2
+
+                        Text {
+                            text: MusicSources.onlineTrackCount
+                            color: root.mangaText
+                            font.pixelSize: 18
+                            font.weight: Font.DemiBold
+                        }
+
+                        Text {
+                            text: AuroraI18n.text("music.onlineTracksReady")
+                            color: root.mangaMutedText
+                            font.pixelSize: 9
+                        }
+                    }
+                }
+            }
 
             Text {
                 width: parent.width
                 text: AuroraI18n.text("music.sourceHint")
                 color: root.mangaText
-                font.pixelSize: 12
+                font.pixelSize: 11
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight
             }
 
             Rectangle {
                 width: parent.width
-                height: 76
-                radius: 8
+                height: 86
+                radius: 10
                 color: AuroraTokens.mangaPaper
                 border.width: 2
                 border.color: sourceInput.activeFocus
                               ? root.displayIdentityColor
-                              : AuroraTokens.mangaInk
+                              : Qt.rgba(AuroraTokens.mangaInk.r,
+                                        AuroraTokens.mangaInk.g,
+                                        AuroraTokens.mangaInk.b,
+                                        0.72)
 
                 TextEdit {
                     id: sourceInput
 
                     anchors.fill: parent
-                    anchors.margins: 10
+                    anchors.margins: 11
                     color: root.mangaText
                     selectionColor: Qt.rgba(root.displayIdentityColor.r,
                                             root.displayIdentityColor.g,
@@ -948,7 +1102,7 @@ Item {
                         anchors.top: parent.top
                         text: AuroraI18n.text("music.sourcePlaceholder")
                         color: root.mangaMutedText
-                        font.pixelSize: 12
+                        font.pixelSize: 11
                         visible: sourceInput.text.length === 0
                                  && !sourceInput.activeFocus
                         elide: Text.ElideRight
@@ -958,24 +1112,29 @@ Item {
 
             Row {
                 width: parent.width
-                height: 34
-                spacing: 8
+                height: 40
+                spacing: 10
 
                 Rectangle {
-                    width: 94
-                    height: 34
-                    radius: 8
+                    width: parent.width - 138
+                    height: 40
+                    radius: 9
                     color: sourceInput.text.trim().length > 0
                            ? Qt.rgba(root.displayIdentityColor.r,
                                      root.displayIdentityColor.g,
-                                     root.displayIdentityColor.b, 0.18)
+                                     root.displayIdentityColor.b,
+                                     0.22)
                            : AuroraTokens.mangaWash
                     border.width: 2
                     border.color: AuroraTokens.mangaInk
 
                     Text {
                         anchors.centerIn: parent
-                        text: AuroraI18n.text("music.importSource")
+                        text: root.sourceInputLooksLikeScript(sourceInput.text)
+                              ? AuroraI18n.text("music.importSource")
+                              : root.sourceInputLooksLikeResolver(sourceInput.text)
+                                ? AuroraI18n.text("music.resolveSource")
+                                : AuroraI18n.text("music.sourcePrimary")
                         color: root.mangaText
                         font.pixelSize: 11
                         font.weight: Font.DemiBold
@@ -983,77 +1142,26 @@ Item {
 
                     TapHandler {
                         enabled: sourceInput.text.trim().length > 0
-                        onTapped: root.importSourceInput()
-                    }
-                }
-
-                Rectangle {
-                    width: 94
-                    height: 34
-                    radius: 8
-                    color: MusicSources.sourceCount > 0 && !MusicSources.resolving
-                           ? Qt.rgba(root.displayIdentityColor.r,
-                                     root.displayIdentityColor.g,
-                                     root.displayIdentityColor.b, 0.22)
-                           : AuroraTokens.mangaWash
-                    border.width: 2
-                    border.color: AuroraTokens.mangaInk
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: AuroraI18n.text("music.resolveSource")
-                        color: root.mangaText
-                        font.pixelSize: 11
-                        font.weight: Font.DemiBold
-                    }
-
-                    TapHandler {
-                        enabled: MusicSources.sourceCount > 0 && !MusicSources.resolving
-                        onTapped: root.resolveSourceInput()
-                    }
-                }
-
-                Rectangle {
-                    width: 94
-                    height: 34
-                    radius: 8
-                    color: sourceInput.text.trim().length > 0
-                           ? Qt.rgba(root.displayIdentityColor.r,
-                                     root.displayIdentityColor.g,
-                                     root.displayIdentityColor.b, 0.22)
-                           : AuroraTokens.mangaWash
-                    border.width: 2
-                    border.color: AuroraTokens.mangaInk
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: AuroraI18n.text("music.playAddress")
-                        color: root.mangaText
-                        font.pixelSize: 11
-                        font.weight: Font.DemiBold
-                    }
-
-                    TapHandler {
-                        enabled: sourceInput.text.trim().length > 0
+                                 && !MusicSources.busy
+                                 && !MusicSources.resolving
                         onTapped: root.playSourceInput(false)
                     }
                 }
 
                 Rectangle {
-                    width: 94
-                    height: 34
-                    radius: 8
+                    width: 128
+                    height: 40
+                    radius: 9
                     color: sourceInput.text.trim().length > 0
-                           ? Qt.rgba(root.displayIdentityColor.r,
-                                     root.displayIdentityColor.g,
-                                     root.displayIdentityColor.b, 0.18)
+                           && !root.sourceInputLooksLikeScript(sourceInput.text)
+                           ? AuroraTokens.mangaPanel
                            : AuroraTokens.mangaWash
                     border.width: 2
                     border.color: AuroraTokens.mangaInk
 
                     Text {
                         anchors.centerIn: parent
-                        text: AuroraI18n.text("music.appendAddress")
+                        text: AuroraI18n.text("music.sourceQueue")
                         color: root.mangaText
                         font.pixelSize: 11
                         font.weight: Font.DemiBold
@@ -1061,41 +1169,68 @@ Item {
 
                     TapHandler {
                         enabled: sourceInput.text.trim().length > 0
+                                 && !root.sourceInputLooksLikeScript(sourceInput.text)
+                                 && !MusicSources.resolving
                         onTapped: root.playSourceInput(true)
                     }
                 }
             }
 
-            Text {
-                width: parent.width
-                text: AuroraI18n.text("music.sourceHelp")
-                color: root.mangaMutedText
-                font.pixelSize: 10
-                wrapMode: Text.Wrap
-            }
-
             Rectangle {
                 width: parent.width
-                height: 46
-                radius: 8
-                color: AuroraTokens.mangaWash
+                height: 58
+                radius: 10
+                color: Qt.rgba(root.displayIdentityColor.r,
+                               root.displayIdentityColor.g,
+                               root.displayIdentityColor.b,
+                               0.07)
                 border.width: 1
-                border.color: Qt.rgba(AuroraTokens.mangaInk.r,
-                                      AuroraTokens.mangaInk.g,
-                                      AuroraTokens.mangaInk.b,
-                                      0.38)
+                border.color: Qt.rgba(root.displayIdentityColor.r,
+                                      root.displayIdentityColor.g,
+                                      root.displayIdentityColor.b,
+                                      0.30)
 
-                Text {
+                Row {
                     anchors.fill: parent
-                    anchors.margins: 9
-                    text: root.sourcePanelStatus
-                    color: MusicSources.errorString.length > 0
-                           ? AuroraTokens.warmAccent
-                           : root.mangaMutedText
-                    font.pixelSize: 11
-                    wrapMode: Text.Wrap
-                    elide: Text.ElideRight
-                    maximumLineCount: 2
+                    anchors.margins: 10
+                    spacing: 10
+
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 8
+                        height: 8
+                        radius: 4
+                        color: MusicSources.errorString.length > 0
+                               ? AuroraTokens.warmAccent
+                               : root.displayIdentityColor
+                    }
+
+                    Column {
+                        width: parent.width - 18
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2
+
+                        Text {
+                            width: parent.width
+                            text: root.sourcePanelStatus
+                            color: MusicSources.errorString.length > 0
+                                   ? AuroraTokens.warmAccent
+                                   : root.mangaText
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: AuroraI18n.text("music.sourceTrustBody")
+                            color: root.mangaMutedText
+                            font.pixelSize: 9
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 2
+                            elide: Text.ElideRight
+                        }
+                    }
                 }
             }
         }
@@ -1625,23 +1760,50 @@ Item {
                         required property string album
 
                         width: onlineList.width
-                        height: 58
-                        radius: 8
-                        color: Qt.rgba(AuroraTokens.mangaInk.r,
-                                       AuroraTokens.mangaInk.g,
-                                       AuroraTokens.mangaInk.b,
-                                       0.045)
-                        border.width: 2
+                        height: 68
+                        radius: 10
+                        color: Qt.rgba(root.displayIdentityColor.r,
+                                       root.displayIdentityColor.g,
+                                       root.displayIdentityColor.b,
+                                       0.055)
+                        border.width: 1
                         border.color: Qt.rgba(AuroraTokens.mangaInk.r,
                                               AuroraTokens.mangaInk.g,
                                               AuroraTokens.mangaInk.b,
-                                              0.20)
+                                              0.18)
+
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 48
+                            height: 28
+                            radius: 14
+                            color: Qt.rgba(root.displayIdentityColor.r,
+                                           root.displayIdentityColor.g,
+                                           root.displayIdentityColor.b,
+                                           0.14)
+                            border.width: 1
+                            border.color: Qt.rgba(root.displayIdentityColor.r,
+                                                  root.displayIdentityColor.g,
+                                                  root.displayIdentityColor.b,
+                                                  0.34)
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: source.toUpperCase()
+                                color: root.mangaText
+                                font.pixelSize: 9
+                                font.weight: Font.DemiBold
+                                elide: Text.ElideRight
+                            }
+                        }
 
                         Column {
                             anchors.left: parent.left
-                            anchors.right: parent.right
+                            anchors.right: playGlyph.left
                             anchors.verticalCenter: parent.verticalCenter
-                            anchors.leftMargin: 10
+                            anchors.leftMargin: 70
                             anchors.rightMargin: 10
                             spacing: 4
 
@@ -1650,6 +1812,7 @@ Item {
                                 text: title
                                 color: root.mangaText
                                 font.pixelSize: 12
+                                font.weight: Font.DemiBold
                                 elide: Text.ElideRight
                             }
 
@@ -1657,11 +1820,22 @@ Item {
                                 width: parent.width
                                 text: artist.length > 0
                                       ? artist + (album.length > 0 ? " · " + album : "")
-                                      : source + ":" + songId
+                                      : songId
                                 color: root.mangaMutedText
                                 font.pixelSize: 10
                                 elide: Text.ElideRight
                             }
+                        }
+
+                        Text {
+                            id: playGlyph
+                            anchors.right: parent.right
+                            anchors.rightMargin: 12
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "↗"
+                            color: root.displayIdentityColor
+                            font.pixelSize: 16
+                            font.weight: Font.DemiBold
                         }
 
                         TapHandler {
@@ -1827,6 +2001,18 @@ Item {
 
                 Text {
                     width: parent.width
+                    visible: root.controlsVisible && AudioRuntime.hasTrack
+                    text: root.playbackTrustLabel.toUpperCase()
+                    color: root.displayIdentityColor
+                    opacity: 0.82
+                    font.pixelSize: 10
+                    font.letterSpacing: 1.2
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    width: parent.width
                     text: root.displayTitle
                     color: root.mangaText
                     font.pixelSize: root.controlsVisible ? 36 : 48
@@ -1852,13 +2038,59 @@ Item {
                     elide: Text.ElideRight
                 }
 
-                Text {
+                Rectangle {
                     visible: AudioRuntime.errorString.length > 0
                     width: parent.width
-                    text: AuroraI18n.text("memory.unavailable")
-                    color: AuroraTokens.warmAccent
-                    font.pixelSize: 13
-                    wrapMode: Text.Wrap
+                    height: 58
+                    radius: 10
+                    color: Qt.rgba(AuroraTokens.warmAccent.r,
+                                   AuroraTokens.warmAccent.g,
+                                   AuroraTokens.warmAccent.b,
+                                   0.09)
+                    border.width: 1
+                    border.color: AuroraTokens.warmAccent
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 10
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - 116
+                            text: AuroraI18n.text("music.playbackUnavailable")
+                            color: AuroraTokens.warmAccent
+                            font.pixelSize: 12
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 2
+                            elide: Text.ElideRight
+                        }
+
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 106
+                            height: 34
+                            radius: 8
+                            color: AuroraTokens.mangaPanel
+                            border.width: 1
+                            border.color: AuroraTokens.mangaInk
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: AuroraI18n.text("music.reconnectSource")
+                                color: AuroraTokens.mangaInk
+                                font.pixelSize: 10
+                                font.weight: Font.DemiBold
+                            }
+
+                            TapHandler {
+                                onTapped: {
+                                    root.sourcePanelExpanded = true
+                                    root.revealControls()
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
