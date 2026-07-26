@@ -39,7 +39,7 @@ Item {
         root.showingLatestMoment
         ? AuroraI18n.momentHeading(Moments.latestHeading)
         : AudioRuntime.hasTrack
-          ? AuroraI18n.text("home.currentSession")
+          ? AuroraI18n.text("home.currentRoom")
           : AuroraI18n.text("home.begin")
     readonly property string homeMeaning:
         root.showingLatestMoment ? Moments.latestConfirmedMeaning : ""
@@ -196,6 +196,7 @@ Item {
         Text {
             width: parent.width
             visible: root.homeMeaning.length === 0
+                     && (root.showingLatestMoment || !AudioRuntime.hasTrack)
             text: root.homePeriod
             color: AuroraTokens.mangaMuted
             opacity: 0.72
