@@ -22,6 +22,15 @@ Item {
     property bool transitionCrystalSettling: false
     property real presencePhase: 0.0
 
+    readonly property bool cinematicWide: width >= 920
+    readonly property real presenceStrength:
+        Math.max(0.0, Math.min(1.0,
+            0.26
+            + (AudioRuntime.playing ? 0.22 : AudioRuntime.hasTrack ? 0.10 : 0.0)
+            + AudioRuntime.audioLevel * 0.24
+            + AudioRuntime.bassEnergy * 0.18
+            + AudioRuntime.transientEnergy * 0.10))
+
     readonly property string displayTitle:
         AudioRuntime.hasTrack ? AudioRuntime.title : AuroraI18n.text("demo.track")
     readonly property string displayArtist:
@@ -382,6 +391,7 @@ Item {
 
     MangaBackdrop {
         anchors.fill: parent
+        opacity: root.controlsVisible ? 0.62 : 0.42
         accentColor: root.displayIdentityColor
         secondaryColor: AuroraTokens.memoryAccent
         energy: (AudioRuntime.playing ? 0.48 : AudioRuntime.hasTrack ? 0.30 : 0.16)
@@ -434,7 +444,7 @@ Item {
         transientEnergy: AudioRuntime.transientEnergy
         paperMode: true
         opacity: root.flowSceneEnabled
-                 ? (root.controlsVisible ? 0.34 : 0.50)
+                 ? (root.controlsVisible ? 0.24 : 0.34)
                  : 0.0
 
         Behavior on opacity {
@@ -448,11 +458,69 @@ Item {
     }
 
     Item {
+        id: cinematicColorField
+
+        anchors.fill: parent
+        opacity: root.controlsVisible ? 0.54 : 0.84
+
+        Repeater {
+            model: 3
+
+            delegate: Rectangle {
+                required property int index
+
+                width: parent.width * (index === 0 ? 0.56 : index === 1 ? 0.42 : 0.34)
+                height: parent.height * (index === 0 ? 0.72 : index === 1 ? 0.58 : 0.46)
+                radius: Math.min(width, height) * 0.48
+                x: index === 0
+                   ? parent.width * 0.42 + Math.sin(root.presencePhase * 0.23) * 24
+                   : index === 1
+                     ? parent.width * 0.04 + Math.sin(root.presencePhase * 0.31 + 1.2) * 18
+                     : parent.width * 0.66 + Math.sin(root.presencePhase * 0.27 + 2.1) * 16
+                y: index === 0
+                   ? parent.height * 0.08 + Math.cos(root.presencePhase * 0.19) * 16
+                   : index === 1
+                     ? parent.height * 0.34 + Math.cos(root.presencePhase * 0.25 + 0.8) * 14
+                     : parent.height * 0.44 + Math.cos(root.presencePhase * 0.21 + 1.6) * 12
+                color: index === 0
+                       ? Qt.rgba(root.displayIdentityColor.r,
+                                 root.displayIdentityColor.g,
+                                 root.displayIdentityColor.b,
+                                 0.045 + root.presenceStrength * 0.055)
+                       : index === 1
+                         ? Qt.rgba(AuroraTokens.memoryAccent.r,
+                                   AuroraTokens.memoryAccent.g,
+                                   AuroraTokens.memoryAccent.b,
+                                   0.032 + AudioRuntime.midEnergy * 0.045)
+                         : Qt.rgba(AuroraTokens.warmAccent.r,
+                                   AuroraTokens.warmAccent.g,
+                                   AuroraTokens.warmAccent.b,
+                                   0.026 + AudioRuntime.highEnergy * 0.038)
+                rotation: root.reducedMotion
+                          ? (index === 0 ? -8 : index === 1 ? 11 : -4)
+                          : (index === 0 ? -8 : index === 1 ? 11 : -4)
+                            + Math.sin(root.presencePhase * (0.18 + index * 0.04)) * 2.2
+                scale: 1.0
+                       + AudioRuntime.bassEnergy * (0.025 + index * 0.010)
+                       + AudioRuntime.transientEnergy * 0.012
+
+                Behavior on scale {
+                    NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
+                }
+            }
+        }
+
+        Behavior on opacity {
+            NumberAnimation { duration: 420; easing.type: Easing.OutCubic }
+        }
+    }
+
+    Item {
         anchors.centerIn: parent
         anchors.verticalCenterOffset: -34
         width: Math.min(root.width * 0.58, root.height * 0.78)
         height: width * 0.86
-        opacity: AudioRuntime.hasTrack ? 0.42 : 0.24
+        opacity: AudioRuntime.hasTrack ? (root.controlsVisible ? 0.22 : 0.30) : 0.16
         scale: 1.0 + AudioRuntime.bassEnergy * 0.035 + AudioRuntime.transientEnergy * 0.020
 
         Rectangle {
@@ -499,8 +567,8 @@ Item {
         width: Math.min(root.width * 0.76, root.height * 1.02)
         height: width
         opacity: AudioRuntime.hasTrack
-                 ? (root.controlsVisible ? 0.44 : 0.74)
-                 : 0.22
+                 ? (root.controlsVisible ? 0.28 : 0.48)
+                 : 0.16
         scale: 1.0
                + AudioRuntime.bassEnergy * 0.032
                + AudioRuntime.transientEnergy * 0.018
@@ -508,7 +576,7 @@ Item {
                   ? 0
                   : Math.sin(root.presencePhase * 0.42) * 2.4
         Repeater {
-            model: 3
+            model: 2
 
             delegate: Rectangle {
                 required property int index
@@ -1635,42 +1703,62 @@ Item {
         transientEnergy: AudioRuntime.transientEnergy
     }
 
-    Column {
+    Item {
         id: playerContent
-        anchors.centerIn: parent
-        anchors.verticalCenterOffset: root.controlsVisible ? -18 : -26
+
+        anchors.fill: parent
+        anchors.leftMargin: root.controlsVisible ? 72 : 48
+        anchors.rightMargin: root.controlsVisible ? 72 : 48
+        anchors.topMargin: root.controlsVisible ? 62 : 48
+        anchors.bottomMargin: root.controlsVisible ? 58 : 42
         opacity: !liquidTrackTransition.running
                  ? 1.0
                  : root.transitionLanding ? 1.0 : 0.02
         scale: !liquidTrackTransition.running
                ? 1.0
                : root.transitionLanding ? 1.0 : 0.972
+        z: 4
+
+        readonly property bool wide: width >= 820
+        readonly property real resolvedCrystalSize:
+            wide
+            ? Math.min(root.controlsVisible ? 372 : 432,
+                       height * (root.controlsVisible ? 0.62 : 0.72))
+            : Math.min(root.controlsVisible ? 340 : 390,
+                       width * 0.72,
+                       height * 0.52)
+        readonly property real resolvedCrystalX:
+            wide
+            ? width * (root.controlsVisible ? 0.62 : 0.66)
+              - resolvedCrystalSize / 2
+            : width / 2 - resolvedCrystalSize / 2
+        readonly property real resolvedCrystalY:
+            wide
+            ? height * 0.47 - resolvedCrystalSize / 2
+            : height * 0.08
+        readonly property real identityWidth:
+            wide ? Math.min(390, width * 0.36) : Math.min(560, width * 0.82)
 
         Behavior on opacity {
             OpacityAnimator {
-                duration: root.accessibilityMode === AuroraTypes.AccessibilityReducedMotion
-                          ? AuroraTokens.motionSoft
-                          : 440
+                duration: root.reducedMotion ? AuroraTokens.motionSoft : 440
                 easing.type: Easing.OutQuint
             }
         }
 
         Behavior on scale {
             ScaleAnimator {
-                duration: root.accessibilityMode === AuroraTypes.AccessibilityReducedMotion
-                          ? AuroraTokens.motionSoft
-                          : 500
+                duration: root.reducedMotion ? AuroraTokens.motionSoft : 500
                 easing.type: Easing.OutQuint
             }
         }
-        width: Math.min(parent.width * 0.78, root.controlsVisible ? 640 : 700)
-        spacing: root.controlsVisible ? 20 : 8
 
         AuroraCrystal {
             id: mainCrystal
-            anchors.horizontalCenter: parent.horizontalCenter
-            crystalSize: Math.min(root.controlsVisible ? 410 : 500,
-                                  Math.max(300, root.height * (root.controlsVisible ? 0.42 : 0.54)))
+
+            x: playerContent.resolvedCrystalX
+            y: playerContent.resolvedCrystalY
+            crystalSize: playerContent.resolvedCrystalSize
             title: root.displayTitle
             artist: root.displayArtist
             artworkSource: AudioRuntime.hasTrack
@@ -1694,77 +1782,178 @@ Item {
             transientEnergy: root.transitionCrystalSettling ? 0.0 : AudioRuntime.transientEnergy
             opacity: root.identityVisible ? 1.0 : 0.0
 
+            Behavior on x {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 520; easing.type: Easing.OutQuint }
+            }
+            Behavior on y {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 520; easing.type: Easing.OutQuint }
+            }
+            Behavior on crystalSize {
+                NumberAnimation { duration: 520; easing.type: Easing.OutQuint }
+            }
             Behavior on opacity {
-                NumberAnimation {
-                    duration: AuroraTokens.motionSoft
-                    easing.type: Easing.OutCubic
-                }
-            }
-        }
-
-        Column {
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width
-            spacing: 7
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-                text: root.displayTitle
-                color: root.mangaText
-                opacity: root.controlsVisible ? 1.0 : 0.92
-                font.pixelSize: root.controlsVisible ? 28 : 34
-                font.weight: Font.DemiBold
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-                text: root.displayArtistLine
-                      + (root.displayAlbum.length > 0
-                         ? (root.displayArtistLine.length > 0 ? " · " : "") + root.displayAlbum
-                         : "")
-                      + (root.controlsVisible && AudioRuntime.queueCount > 0
-                         && (root.displayArtistLine.length > 0 || root.displayAlbum.length > 0)
-                         ? " · " + (AudioRuntime.currentIndex + 1) + "/" + AudioRuntime.queueCount
-                         : root.controlsVisible && AudioRuntime.queueCount > 0
-                           ? (AudioRuntime.currentIndex + 1) + "/" + AudioRuntime.queueCount
-                         : "")
-                color: root.mangaMutedText
-                opacity: root.controlsVisible ? 1.0 : 0.72
-                font.pixelSize: root.controlsVisible ? 14 : 13
-            }
-
-            Text {
-                visible: false
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-                text: AudioRuntime.identityProvenance
-                color: root.mangaMutedText
-                font.pixelSize: 11
-            }
-
-            Text {
-                visible: AudioRuntime.errorString.length > 0
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.Wrap
-                text: AudioRuntime.errorString
-                color: AuroraTokens.warmAccent
-                font.pixelSize: 13
+                NumberAnimation { duration: AuroraTokens.motionSoft; easing.type: Easing.OutCubic }
             }
         }
 
         Item {
-            width: parent.width
-            height: root.controlsVisible ? 34 : 20
+            id: identityCopy
+
+            x: playerContent.wide
+               ? parent.width * 0.06
+               : (parent.width - playerContent.identityWidth) / 2
+            y: playerContent.wide
+               ? parent.height * (root.controlsVisible ? 0.22 : 0.25)
+               : mainCrystal.y + mainCrystal.height + 24
+            width: playerContent.identityWidth
+            height: playerContent.wide ? Math.min(330, parent.height * 0.58) : 220
+
+            Rectangle {
+                width: Math.min(146, parent.width * 0.44)
+                height: 3
+                radius: 2
+                color: root.displayIdentityColor
+                opacity: root.controlsVisible ? 0.64 : 0.84
+            }
+
+            Column {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.topMargin: 22
+                spacing: 10
+
+                Text {
+                    width: parent.width
+                    text: root.displayTitle
+                    color: root.mangaText
+                    font.pixelSize: root.controlsVisible ? 36 : 48
+                    font.weight: Font.DemiBold
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    width: parent.width
+                    visible: root.displayArtistLine.length > 0 || root.displayAlbum.length > 0
+                    text: root.displayArtistLine
+                          + (root.displayAlbum.length > 0
+                             ? (root.displayArtistLine.length > 0 ? " · " : "")
+                               + root.displayAlbum
+                             : "")
+                    color: root.mangaMutedText
+                    opacity: root.controlsVisible ? 0.88 : 0.66
+                    font.pixelSize: root.controlsVisible ? 15 : 16
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    visible: AudioRuntime.errorString.length > 0
+                    width: parent.width
+                    text: AuroraI18n.text("memory.unavailable")
+                    color: AuroraTokens.warmAccent
+                    font.pixelSize: 13
+                    wrapMode: Text.Wrap
+                }
+            }
+
+            Row {
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: playerContent.wide ? 8 : 0
+                spacing: 14
+
+                Rectangle {
+                    width: 44
+                    height: 38
+                    enabled: root.controlsVisible
+                    opacity: root.controlOpacity
+                    radius: 8
+                    color: root.mangaButtonFill
+                    border.width: 2
+                    border.color: root.mangaButtonBorder
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "‹"
+                        color: root.mangaText
+                        font.pixelSize: 24
+                        font.weight: Font.Medium
+                    }
+
+                    TapHandler {
+                        enabled: !liquidTrackTransition.running
+                        onTapped: root.beginTrackTransition(-1)
+                    }
+                }
+
+                AuroraCore {
+                    anchors.verticalCenter: parent.verticalCenter
+                    diameter: root.controlsVisible ? 82 : 62
+                    experienceState: root.transitioning || liquidTrackTransition.running
+                                     ? AuroraTypes.CoreGathering
+                                     : AudioRuntime.coreExperienceState
+                    context: AuroraTypes.MusicSpace
+                    presenceLevel: root.controlsVisible
+                                   ? (AudioRuntime.playing ? 0.72 : AudioRuntime.hasTrack ? 0.38 : 0.24)
+                                   : (AudioRuntime.playing ? 0.42 : AudioRuntime.hasTrack ? 0.24 : 0.14)
+                    accessibilityMode: root.accessibilityMode
+                    qualityMode: root.qualityMode
+                    onRequestPlayPause: {
+                        if (AudioRuntime.hasTrack)
+                            AudioRuntime.togglePlayback()
+                        else
+                            audioDialog.open()
+                    }
+                }
+
+                Rectangle {
+                    width: 44
+                    height: 38
+                    enabled: root.controlsVisible
+                    opacity: root.controlOpacity
+                    radius: 8
+                    color: root.mangaButtonFill
+                    border.width: 2
+                    border.color: root.mangaButtonBorder
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "›"
+                        color: root.mangaText
+                        font.pixelSize: 24
+                        font.weight: Font.Medium
+                    }
+
+                    TapHandler {
+                        enabled: !liquidTrackTransition.running
+                        onTapped: root.beginTrackTransition(1)
+                    }
+                }
+            }
+
+            Behavior on x {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 520; easing.type: Easing.OutQuint }
+            }
+            Behavior on y {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 520; easing.type: Easing.OutQuint }
+            }
+        }
+
+        Item {
+            id: timeTrace
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: root.controlsVisible ? 42 : 18
 
             Text {
                 anchors.left: parent.left
@@ -1779,18 +1968,16 @@ Item {
                 id: progressTrack
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.leftMargin: root.controlsVisible ? 48 : 176
-                anchors.rightMargin: root.controlsVisible ? 48 : 176
+                anchors.leftMargin: root.controlsVisible ? 52 : parent.width * 0.22
+                anchors.rightMargin: root.controlsVisible ? 52 : parent.width * 0.22
                 anchors.verticalCenter: parent.verticalCenter
                 height: root.controlsVisible ? 5 : 2
                 radius: height / 2
-                opacity: root.controlsVisible
-                         ? 1.0
-                         : AudioRuntime.hasTrack ? 0.48 : 0.0
+                opacity: root.controlsVisible ? 1.0 : AudioRuntime.hasTrack ? 0.42 : 0.0
                 color: Qt.rgba(AuroraTokens.mangaInk.r,
                                AuroraTokens.mangaInk.g,
                                AuroraTokens.mangaInk.b,
-                               root.controlsVisible ? 0.16 : 0.070)
+                               root.controlsVisible ? 0.16 : 0.060)
 
                 Rectangle {
                     width: parent.width * root.progressRatio
@@ -1821,95 +2008,13 @@ Item {
         }
 
         Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 18
-
-            Rectangle {
-                width: 76
-                height: 42
-                enabled: root.controlsVisible
-                opacity: root.controlOpacity
-                scale: 0.965 + root.controlOpacity * 0.035
-                radius: 8
-                color: root.mangaButtonFill
-                border.width: 2
-                border.color: root.mangaButtonBorder
-
-                Text {
-                    anchors.centerIn: parent
-                    text: AuroraI18n.text("music.previous")
-                    color: root.mangaText
-                    font.pixelSize: 12
-                    font.weight: Font.DemiBold
-                }
-
-                TapHandler {
-                    enabled: !liquidTrackTransition.running
-                    onTapped: root.beginTrackTransition(-1)
-                }
-
-                Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-                Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-            }
-
-            AuroraCore {
-                anchors.verticalCenter: parent.verticalCenter
-                diameter: root.controlsVisible ? 90 : 52
-                experienceState: root.transitioning || liquidTrackTransition.running
-                                 ? AuroraTypes.CoreGathering
-                                 : AudioRuntime.coreExperienceState
-                context: AuroraTypes.MusicSpace
-                presenceLevel: root.controlsVisible
-                               ? (AudioRuntime.playing ? 0.72 : AudioRuntime.hasTrack ? 0.38 : 0.24)
-                               : (AudioRuntime.playing ? 0.34 : AudioRuntime.hasTrack ? 0.20 : 0.14)
-                accessibilityMode: root.accessibilityMode
-                qualityMode: root.qualityMode
-                onRequestPlayPause: {
-                    if (AudioRuntime.hasTrack)
-                        AudioRuntime.togglePlayback()
-                    else
-                        audioDialog.open()
-                }
-            }
-
-            Rectangle {
-                width: 76
-                height: 42
-                enabled: root.controlsVisible
-                opacity: root.controlOpacity
-                scale: 0.965 + root.controlOpacity * 0.035
-                radius: 8
-                color: root.mangaButtonFill
-                border.width: 2
-                border.color: root.mangaButtonBorder
-
-                Text {
-                    anchors.centerIn: parent
-                    text: AuroraI18n.text("music.next")
-                    color: root.mangaText
-                    font.pixelSize: 12
-                    font.weight: Font.DemiBold
-                }
-
-                TapHandler {
-                    enabled: !liquidTrackTransition.running
-                    onTapped: root.beginTrackTransition(1)
-                }
-
-                Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-                Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-            }
-        }
-
-        Row {
-            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.left: parent.left
+            anchors.bottom: timeTrace.top
+            anchors.bottomMargin: 8
             spacing: 10
             enabled: root.controlsVisible
             opacity: root.controlOpacity
-            scale: 0.965 + root.controlOpacity * 0.035
-
-            Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-            Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+            scale: 0.97 + root.controlOpacity * 0.03
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
@@ -1920,7 +2025,7 @@ Item {
 
             Rectangle {
                 id: volumeTrack
-                width: 140
+                width: 132
                 height: 5
                 radius: 3
                 color: Qt.rgba(AuroraTokens.mangaInk.r,
@@ -1950,6 +2055,9 @@ Item {
                 color: root.mangaMutedText
                 font.pixelSize: 12
             }
+
+            Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+            Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
         }
     }
 

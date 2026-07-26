@@ -46,6 +46,8 @@ FocusScope {
         heroMode && motionEnabled && audioReactiveAvailable
     readonly property bool framedArtwork:
         heroMode && crystalSize >= 250
+    readonly property real artworkInset:
+        framedArtwork ? crystalSize * (mangaMode ? 0.075 : 0.060) : 0.0
     readonly property real level:
         reactiveEnabled ? Math.max(0, Math.min(1, audioLevel)) : 0.0
     readonly property real bass:
@@ -100,7 +102,7 @@ FocusScope {
     }
 
     Repeater {
-        model: root.heroMode && root.qualityMode !== AuroraTypes.Eco ? 3 : 0
+        model: root.heroMode && root.qualityMode !== AuroraTypes.Eco ? 2 : 0
 
         delegate: Rectangle {
             required property int index
@@ -153,20 +155,22 @@ FocusScope {
         anchors.fill: parent
         radius: width * (root.heroMode ? 0.28 : 0.10)
         opacity: root.heroMode ? 0.96 : 1.0
-        color: root.mangaMode
+        color: root.heroMode
                ? Qt.rgba(root.colorSignature.r,
                          root.colorSignature.g,
                          root.colorSignature.b,
-                         root.heroMode ? 0.18 : 0.24)
-               : root.heroMode
-               ? Qt.rgba(root.colorSignature.r,
-                         root.colorSignature.g,
-                         root.colorSignature.b,
-                         0.26)
-               : Qt.darker(root.colorSignature, 1.5)
-        border.width: root.mangaMode
-                      ? (root.activeFocus ? 4 : root.heroMode ? 2 : 3)
-                      : root.activeFocus ? 3 : (root.heroMode ? 0 : root.transitioning ? 2 : 1)
+                         root.mangaMode ? 0.050 : 0.085)
+               : root.mangaMode
+                 ? Qt.rgba(root.colorSignature.r,
+                           root.colorSignature.g,
+                           root.colorSignature.b,
+                           0.24)
+                 : Qt.darker(root.colorSignature, 1.5)
+        border.width: root.activeFocus
+                      ? 4
+                      : root.heroMode ? 0
+                      : root.mangaMode ? 3
+                      : root.transitioning ? 2 : 1
         border.color: root.activeFocus
                       ? AuroraTokens.focusRing
                       : root.mangaMode
@@ -182,9 +186,11 @@ FocusScope {
         Rectangle {
             id: artworkFrame
             anchors.fill: parent
-            anchors.margins: root.framedArtwork ? parent.width * 0.032 : 0
-            radius: root.framedArtwork ? width * 0.20 : 0
+            anchors.margins: root.artworkInset
+            radius: root.framedArtwork ? width * 0.28 : 0
             visible: root.hasArtwork && !root.unavailable
+            clip: true
+            scale: 1.0 + root.bass * 0.018 + root.transientLevel * 0.012
             color: root.mangaMode
                    ? Qt.rgba(AuroraTokens.mangaPanel.r,
                              AuroraTokens.mangaPanel.g,
@@ -194,70 +200,91 @@ FocusScope {
                              root.colorSignature.g,
                              root.colorSignature.b,
                              0.26)
-            border.width: root.framedArtwork ? 2 : 0
+            border.width: root.framedArtwork ? 3 : 0
             border.color: root.mangaMode
                           ? Qt.rgba(AuroraTokens.mangaInk.r,
                                     AuroraTokens.mangaInk.g,
                                     AuroraTokens.mangaInk.b,
                                     0.24 + root.high * 0.08)
                           : Qt.rgba(1, 1, 1, 0.14 + root.high * 0.08)
-        }
 
-        Image {
-            id: artworkImage
-            anchors.fill: parent
-            anchors.margins: root.framedArtwork ? parent.width * 0.050 : 0
-            source: root.artworkSource
-            fillMode: Image.PreserveAspectCrop
-            visible: root.hasArtwork && !root.unavailable
-            asynchronous: true
-        }
+            Image {
+                id: artworkImage
+                anchors.fill: parent
+                anchors.margins: root.framedArtwork ? parent.width * 0.018 : 0
+                source: root.artworkSource
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+            }
 
-        Rectangle {
-            anchors.fill: artworkImage
-            visible: root.hasArtwork && !root.unavailable && root.heroMode
-            gradient: Gradient {
-                GradientStop {
-                    position: 0.0
-                    color: root.mangaMode
-                           ? Qt.rgba(root.colorSignature.r,
-                                     root.colorSignature.g,
-                                     root.colorSignature.b,
-                                     0.10 + root.mid * 0.05)
-                           : Qt.rgba(root.colorSignature.r,
-                                     root.colorSignature.g,
-                                     root.colorSignature.b,
-                                     0.18 + root.mid * 0.08)
-                }
-                GradientStop {
-                    position: 0.52
-                    color: root.mangaMode
-                           ? Qt.rgba(1, 1, 1, 0.10)
-                           : Qt.rgba(0, 0, 0, 0.02)
-                }
-                GradientStop {
-                    position: 1.0
-                    color: root.mangaMode
-                           ? Qt.rgba(AuroraTokens.mangaInk.r,
-                                     AuroraTokens.mangaInk.g,
-                                     AuroraTokens.mangaInk.b,
-                                     0.16)
-                           : Qt.rgba(0, 0, 0, 0.22)
+            Rectangle {
+                anchors.fill: artworkImage
+                visible: root.heroMode
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0.0
+                        color: root.mangaMode
+                               ? Qt.rgba(root.colorSignature.r,
+                                         root.colorSignature.g,
+                                         root.colorSignature.b,
+                                         0.10 + root.mid * 0.05)
+                               : Qt.rgba(root.colorSignature.r,
+                                         root.colorSignature.g,
+                                         root.colorSignature.b,
+                                         0.18 + root.mid * 0.08)
+                    }
+                    GradientStop {
+                        position: 0.52
+                        color: root.mangaMode
+                               ? Qt.rgba(1, 1, 1, 0.10)
+                               : Qt.rgba(0, 0, 0, 0.02)
+                    }
+                    GradientStop {
+                        position: 1.0
+                        color: root.mangaMode
+                               ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                         AuroraTokens.mangaInk.g,
+                                         AuroraTokens.mangaInk.b,
+                                         0.16)
+                               : Qt.rgba(0, 0, 0, 0.22)
+                    }
                 }
             }
-        }
 
-        Rectangle {
-            anchors.fill: artworkImage
-            visible: root.hasArtwork && !root.unavailable && root.heroMode
-            color: "transparent"
-            border.width: 2
-            border.color: root.mangaMode
-                          ? Qt.rgba(AuroraTokens.mangaInk.r,
-                                    AuroraTokens.mangaInk.g,
-                                    AuroraTokens.mangaInk.b,
-                                    0.22 + root.high * 0.08)
-                          : Qt.rgba(1, 1, 1, 0.14 + root.high * 0.10)
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: parent.width * 0.18
+                color: Qt.rgba(root.colorSignature.r,
+                               root.colorSignature.g,
+                               root.colorSignature.b,
+                               0.10 + root.mid * 0.08)
+            }
+
+            Rectangle {
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: parent.width * 0.12
+                color: Qt.rgba(AuroraTokens.mangaPaper.r,
+                               AuroraTokens.mangaPaper.g,
+                               AuroraTokens.mangaPaper.b,
+                               0.055 + root.high * 0.055)
+            }
+
+            Rectangle {
+                anchors.fill: artworkImage
+                visible: root.heroMode
+                color: "transparent"
+                border.width: 2
+                border.color: root.mangaMode
+                              ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                        AuroraTokens.mangaInk.g,
+                                        AuroraTokens.mangaInk.b,
+                                        0.22 + root.high * 0.08)
+                              : Qt.rgba(1, 1, 1, 0.14 + root.high * 0.10)
+            }
         }
 
         Repeater {
