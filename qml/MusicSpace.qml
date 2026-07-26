@@ -1638,7 +1638,7 @@ Item {
     Column {
         id: playerContent
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: root.controlsVisible ? -18 : -34
+        anchors.verticalCenterOffset: root.controlsVisible ? -18 : -26
         opacity: !liquidTrackTransition.running
                  ? 1.0
                  : root.transitionLanding ? 1.0 : 0.02
@@ -1663,14 +1663,14 @@ Item {
                 easing.type: Easing.OutQuint
             }
         }
-        width: Math.min(parent.width * 0.78, root.controlsVisible ? 640 : 720)
-        spacing: root.controlsVisible ? 20 : 14
+        width: Math.min(parent.width * 0.78, root.controlsVisible ? 640 : 700)
+        spacing: root.controlsVisible ? 20 : 8
 
         AuroraCrystal {
             id: mainCrystal
             anchors.horizontalCenter: parent.horizontalCenter
-            crystalSize: Math.min(root.controlsVisible ? 410 : 560,
-                                  Math.max(300, root.height * (root.controlsVisible ? 0.42 : 0.60)))
+            crystalSize: Math.min(root.controlsVisible ? 410 : 500,
+                                  Math.max(300, root.height * (root.controlsVisible ? 0.42 : 0.54)))
             title: root.displayTitle
             artist: root.displayArtist
             artworkSource: AudioRuntime.hasTrack
@@ -1715,7 +1715,7 @@ Item {
                 text: root.displayTitle
                 color: root.mangaText
                 opacity: root.controlsVisible ? 1.0 : 0.92
-                font.pixelSize: root.controlsVisible ? 28 : 30
+                font.pixelSize: root.controlsVisible ? 28 : 34
                 font.weight: Font.DemiBold
             }
 
@@ -1736,7 +1736,7 @@ Item {
                          : "")
                 color: root.mangaMutedText
                 opacity: root.controlsVisible ? 1.0 : 0.72
-                font.pixelSize: root.controlsVisible ? 14 : 15
+                font.pixelSize: root.controlsVisible ? 14 : 13
             }
 
             Text {
@@ -1764,7 +1764,7 @@ Item {
 
         Item {
             width: parent.width
-            height: 34
+            height: root.controlsVisible ? 34 : 20
 
             Text {
                 anchors.left: parent.left
@@ -1779,8 +1779,8 @@ Item {
                 id: progressTrack
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.leftMargin: root.controlsVisible ? 48 : 150
-                anchors.rightMargin: root.controlsVisible ? 48 : 150
+                anchors.leftMargin: root.controlsVisible ? 48 : 176
+                anchors.rightMargin: root.controlsVisible ? 48 : 176
                 anchors.verticalCenter: parent.verticalCenter
                 height: root.controlsVisible ? 5 : 2
                 radius: height / 2
@@ -1854,14 +1854,14 @@ Item {
 
             AuroraCore {
                 anchors.verticalCenter: parent.verticalCenter
-                diameter: root.controlsVisible ? 90 : 66
+                diameter: root.controlsVisible ? 90 : 52
                 experienceState: root.transitioning || liquidTrackTransition.running
                                  ? AuroraTypes.CoreGathering
                                  : AudioRuntime.coreExperienceState
                 context: AuroraTypes.MusicSpace
                 presenceLevel: root.controlsVisible
                                ? (AudioRuntime.playing ? 0.72 : AudioRuntime.hasTrack ? 0.38 : 0.24)
-                               : (AudioRuntime.playing ? 0.42 : AudioRuntime.hasTrack ? 0.24 : 0.16)
+                               : (AudioRuntime.playing ? 0.34 : AudioRuntime.hasTrack ? 0.20 : 0.14)
                 accessibilityMode: root.accessibilityMode
                 qualityMode: root.qualityMode
                 onRequestPlayPause: {

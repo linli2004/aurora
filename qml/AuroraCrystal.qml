@@ -44,6 +44,8 @@ FocusScope {
         && qualityMode !== AuroraTypes.Eco
     readonly property bool reactiveEnabled:
         heroMode && motionEnabled && audioReactiveAvailable
+    readonly property bool framedArtwork:
+        heroMode && crystalSize >= 250
     readonly property real level:
         reactiveEnabled ? Math.max(0, Math.min(1, audioLevel)) : 0.0
     readonly property real bass:
@@ -177,8 +179,34 @@ FocusScope {
                         : AuroraTokens.lineSubtle
         clip: true
 
-        Image {
+        Rectangle {
+            id: artworkFrame
             anchors.fill: parent
+            anchors.margins: root.framedArtwork ? parent.width * 0.032 : 0
+            radius: root.framedArtwork ? width * 0.20 : 0
+            visible: root.hasArtwork && !root.unavailable
+            color: root.mangaMode
+                   ? Qt.rgba(AuroraTokens.mangaPanel.r,
+                             AuroraTokens.mangaPanel.g,
+                             AuroraTokens.mangaPanel.b,
+                             0.34)
+                   : Qt.rgba(root.colorSignature.r,
+                             root.colorSignature.g,
+                             root.colorSignature.b,
+                             0.26)
+            border.width: root.framedArtwork ? 2 : 0
+            border.color: root.mangaMode
+                          ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                    AuroraTokens.mangaInk.g,
+                                    AuroraTokens.mangaInk.b,
+                                    0.24 + root.high * 0.08)
+                          : Qt.rgba(1, 1, 1, 0.14 + root.high * 0.08)
+        }
+
+        Image {
+            id: artworkImage
+            anchors.fill: parent
+            anchors.margins: root.framedArtwork ? parent.width * 0.050 : 0
             source: root.artworkSource
             fillMode: Image.PreserveAspectCrop
             visible: root.hasArtwork && !root.unavailable
@@ -186,7 +214,7 @@ FocusScope {
         }
 
         Rectangle {
-            anchors.fill: parent
+            anchors.fill: artworkImage
             visible: root.hasArtwork && !root.unavailable && root.heroMode
             gradient: Gradient {
                 GradientStop {
@@ -217,6 +245,19 @@ FocusScope {
                            : Qt.rgba(0, 0, 0, 0.22)
                 }
             }
+        }
+
+        Rectangle {
+            anchors.fill: artworkImage
+            visible: root.hasArtwork && !root.unavailable && root.heroMode
+            color: "transparent"
+            border.width: 2
+            border.color: root.mangaMode
+                          ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                    AuroraTokens.mangaInk.g,
+                                    AuroraTokens.mangaInk.b,
+                                    0.22 + root.high * 0.08)
+                          : Qt.rgba(1, 1, 1, 0.14 + root.high * 0.10)
         }
 
         Repeater {
