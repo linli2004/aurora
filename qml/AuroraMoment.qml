@@ -14,6 +14,7 @@ FocusScope {
     property bool recallEnabled: true
     property bool identityVisible: true
     property bool mangaMode: false
+    property bool heroHomeMode: false
 
     property string momentId: "moment-demo"
     property string title: "Late Summer Night"
@@ -87,13 +88,19 @@ FocusScope {
     Rectangle {
         id: surface
         anchors.fill: parent
-        radius: AuroraTokens.momentRadius(root.sizePreset)
-        color: root.mangaMode
+        radius: root.heroHomeMode
+                ? width * 0.28
+                : AuroraTokens.momentRadius(root.sizePreset)
+        color: root.heroHomeMode
+               ? "transparent"
+               : root.mangaMode
                ? AuroraTokens.mangaPanel
                : root.accessibilityMode === AuroraTypes.HighContrast
                ? AuroraTokens.surfaceHighContrast
                : AuroraTokens.surfacePrimary
-        border.width: root.mangaMode ? (root.activeFocus ? 4 : 3)
+        border.width: root.heroHomeMode
+                      ? 0
+                      : root.mangaMode ? (root.activeFocus ? 4 : 3)
                                      : root.activeFocus ? 3 : (root.remembered ? 2 : 1)
         border.color: root.activeFocus
                       ? AuroraTokens.focusRing
@@ -105,7 +112,7 @@ FocusScope {
                                   root.semanticAccent.b,
                                   0.34)
                         : AuroraTokens.lineSubtle
-        clip: true
+        clip: !root.heroHomeMode
         transform: Translate { y: hoverHandler.hovered ? -4 : 0 }
         scale: hoverHandler.hovered && root.accessibilityMode !== AuroraTypes.ReducedMotion ? 1.015 : 1.0
 
@@ -121,11 +128,11 @@ FocusScope {
             accessibilityMode: root.accessibilityMode
             qualityMode: root.qualityMode
             paperMode: root.mangaMode
-            opacity: root.mangaMode ? 0.16 : 1.0
+            opacity: root.heroHomeMode ? 0.0 : root.mangaMode ? 0.16 : 1.0
         }
 
         Repeater {
-            model: root.mangaMode ? 9 : 0
+            model: root.mangaMode && !root.heroHomeMode ? 9 : 0
 
             delegate: Rectangle {
                 required property int index
@@ -143,6 +150,7 @@ FocusScope {
 
         // Temporal trace: a restrained horizontal memory mark, never a rarity badge.
         Rectangle {
+            visible: !root.heroHomeMode
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.leftMargin: parent.width * 0.09
@@ -163,8 +171,8 @@ FocusScope {
         AuroraCrystal {
             id: crystal
             anchors.horizontalCenter: parent.horizontalCenter
-            y: parent.height * 0.12
-            crystalSize: parent.width * 0.40
+            y: parent.height * (root.heroHomeMode ? 0.10 : 0.12)
+            crystalSize: parent.width * (root.heroHomeMode ? 0.72 : 0.40)
             title: root.trackTitle
             artist: root.artist
             artworkSource: root.artworkSource
@@ -177,7 +185,7 @@ FocusScope {
             context: AuroraTypes.Moment
             accessibilityMode: root.accessibilityMode
             qualityMode: root.qualityMode
-            heroMode: root.mangaMode
+            heroMode: root.mangaMode || root.heroHomeMode
             mangaMode: root.mangaMode
             opacity: root.identityVisible ? 1.0 : 0.0
 
@@ -192,6 +200,7 @@ FocusScope {
         }
 
         Column {
+            visible: !root.heroHomeMode
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
@@ -259,7 +268,8 @@ FocusScope {
         }
 
         Rectangle {
-            visible: root.experienceState === AuroraTypes.MomentMeaningful
+            visible: !root.heroHomeMode
+                     && root.experienceState === AuroraTypes.MomentMeaningful
             width: parent.width * 0.028
             height: width
             radius: width / 2

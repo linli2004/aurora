@@ -8,12 +8,46 @@ Item {
     property int qualityMode: AuroraTypes.Balanced
     property bool identityVisible: true
     property bool transitioning: false
+
     readonly property bool showingLatestMoment:
         Moments.hasMoment
         && (!AudioRuntime.hasTrack
             || Moments.latestTrackId === AudioRuntime.trackId)
-    readonly property string homeArtistLine:
-        AudioRuntime.artist === "Local audio" ? "" : AudioRuntime.artist
+    readonly property string homeTitle:
+        root.showingLatestMoment
+        ? Moments.latestTitle
+        : AudioRuntime.hasTrack
+          ? AudioRuntime.title
+          : AuroraI18n.text("demo.track")
+    readonly property string homeArtist:
+        root.showingLatestMoment
+        ? Moments.latestArtist
+        : AudioRuntime.hasTrack
+          ? (AudioRuntime.artist === "Local audio"
+             || AudioRuntime.artist === "Online source"
+             ? ""
+             : AudioRuntime.artist)
+          : AuroraI18n.text("demo.artist")
+    readonly property string homePeriod:
+        root.showingLatestMoment
+        ? AuroraI18n.momentPeriod(Moments.latestPeriodLabel)
+        : AudioRuntime.hasTrack
+          ? AuroraI18n.text("home.now")
+          : AuroraI18n.text("home.lateNight")
+    readonly property string homeHeading:
+        root.showingLatestMoment
+        ? AuroraI18n.momentHeading(Moments.latestHeading)
+        : AudioRuntime.hasTrack
+          ? AuroraI18n.text("home.currentSession")
+          : AuroraI18n.text("home.begin")
+    readonly property string homeMeaning:
+        root.showingLatestMoment ? Moments.latestConfirmedMeaning : ""
+    readonly property color homeIdentityColor:
+        root.showingLatestMoment
+        ? Moments.latestIdentityColor
+        : AudioRuntime.hasTrack && AudioRuntime.identityColorAvailable
+          ? AudioRuntime.identityColor
+          : AuroraTokens.coolAccent
 
     signal openMusicSpace()
     signal recallLatestMoment()
@@ -22,29 +56,27 @@ Item {
 
     function identityAnchorRect() {
         const origin = currentMoment.mapToItem(root,
-                                               currentMoment.width * 0.30,
-                                               currentMoment.height * 0.12)
-        const size = currentMoment.width * 0.40
+                                               currentMoment.width * 0.14,
+                                               currentMoment.height * 0.10)
+        const size = currentMoment.width * 0.72
         return Qt.rect(origin.x, origin.y, size, size)
     }
 
     MangaBackdrop {
         anchors.fill: parent
-        accentColor: Moments.hasMoment
-                     ? Moments.latestIdentityColor
-                     : AuroraTokens.coolAccent
+        accentColor: root.homeIdentityColor
         secondaryColor: AuroraTokens.warmAccent
-        energy: AudioRuntime.audioLevel * 0.42
-                + (Moments.hasMoment ? 0.20 : 0.12)
+        energy: AudioRuntime.audioLevel * 0.46
+                + (Moments.hasMoment ? 0.30 : 0.16)
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
     }
 
     AtmosphereField {
         anchors.fill: parent
-        primaryColor: AuroraTokens.coolAccent
-        secondaryColor: AuroraTokens.warmAccent
-        presenceLevel: AudioRuntime.playing ? 0.22 : 0.18
+        primaryColor: root.homeIdentityColor
+        secondaryColor: AuroraTokens.memoryAccent
+        presenceLevel: AudioRuntime.playing ? 0.34 : 0.24
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
         audioReactiveAvailable: AudioRuntime.audioReactiveAvailable
@@ -54,15 +86,42 @@ Item {
         highEnergy: AudioRuntime.highEnergy
         transientEnergy: AudioRuntime.transientEnergy
         paperMode: true
-        opacity: 0.16
+        opacity: 0.24
+    }
+
+    Rectangle {
+        anchors.centerIn: currentMoment
+        width: currentMoment.width * 1.18
+        height: width
+        radius: width * 0.28
+        rotation: -7
+        color: Qt.rgba(root.homeIdentityColor.r,
+                       root.homeIdentityColor.g,
+                       root.homeIdentityColor.b,
+                       0.035)
+        border.width: 2
+        border.color: Qt.rgba(AuroraTokens.mangaInk.r,
+                              AuroraTokens.mangaInk.g,
+                              AuroraTokens.mangaInk.b,
+                              0.08)
+        opacity: root.transitioning ? 0.0 : 1.0
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: AuroraTokens.motionSoft
+                easing.type: Easing.OutCubic
+            }
+        }
     }
 
     Column {
+        id: editorial
         anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.leftMargin: Math.max(48, parent.width * 0.065)
-        anchors.topMargin: Math.max(42, parent.height * 0.065)
-        spacing: 8
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.leftMargin: Math.max(52, parent.width * 0.07)
+        anchors.verticalCenterOffset: -18
+        width: Math.min(430, parent.width * 0.34)
+        spacing: 10
 
         Text {
             text: "AURORA"
@@ -72,82 +131,86 @@ Item {
             font.weight: Font.DemiBold
         }
 
-        Text {
-            text: root.showingLatestMoment
-                  ? AuroraI18n.momentHeading(Moments.latestHeading)
-                  : AudioRuntime.hasTrack
-                    ? AuroraI18n.text("home.currentSession")
-                  : AuroraI18n.text("home.begin")
-            color: AuroraTokens.mangaInk
-            font.pixelSize: Math.max(34, root.width * 0.045)
-            font.weight: Font.DemiBold
+        Rectangle {
+            width: Math.min(132, parent.width * 0.38)
+            height: 3
+            radius: 2
+            color: root.homeIdentityColor
+            opacity: 0.72
         }
 
-        Rectangle {
-            width: Math.min(520, root.width * 0.42)
-            height: Math.max(54, homeNote.implicitHeight + 24)
-            radius: 8
-            color: AuroraTokens.mangaPanel
-            border.width: 2
-            border.color: AuroraTokens.mangaInk
-            rotation: -1.2
+        Text {
+            width: parent.width
+            text: root.homeHeading
+            color: AuroraTokens.mangaMuted
+            font.pixelSize: 17
+            font.weight: Font.Medium
+            wrapMode: Text.Wrap
+        }
 
-            Text {
-                id: homeNote
+        Text {
+            width: parent.width
+            text: root.homeTitle
+            color: AuroraTokens.mangaInk
+            font.pixelSize: Math.max(38, root.width * 0.040)
+            font.weight: Font.DemiBold
+            wrapMode: Text.Wrap
+            maximumLineCount: 2
+            elide: Text.ElideRight
+        }
 
-                anchors.fill: parent
-                anchors.margins: 12
-                text: root.showingLatestMoment
-                      ? (Moments.latestConfirmedMeaning.length > 0
-                         ? "「" + Moments.latestConfirmedMeaning + "」"
-                         : Moments.latestTitle + " · " + Moments.latestArtist)
-                      : AudioRuntime.hasTrack
-                        ? AudioRuntime.title + " · " + root.homeArtistLine
-                        : AuroraI18n.text("home.beginNote")
-                color: AuroraTokens.mangaMuted
-                font.pixelSize: 16
-                wrapMode: Text.Wrap
-            }
+        Text {
+            width: parent.width
+            visible: root.homeArtist.length > 0
+            text: root.homeArtist
+            color: AuroraTokens.mangaMuted
+            font.pixelSize: 17
+            elide: Text.ElideRight
+        }
+
+        Text {
+            width: parent.width
+            visible: root.homeMeaning.length > 0
+            text: "「" + root.homeMeaning + "」"
+            color: AuroraTokens.mangaInk
+            opacity: 0.76
+            font.pixelSize: 18
+            wrapMode: Text.Wrap
+            maximumLineCount: 3
+            elide: Text.ElideRight
+            topPadding: 8
+        }
+
+        Text {
+            width: parent.width
+            visible: root.homeMeaning.length === 0
+            text: root.homePeriod
+            color: AuroraTokens.mangaMuted
+            opacity: 0.72
+            font.pixelSize: 14
         }
     }
 
     AuroraMoment {
         id: currentMoment
-        anchors.centerIn: parent
-        sizePreset: root.width < 980 ? 0 : 1
-        title: root.showingLatestMoment
-               ? AuroraI18n.momentHeading(Moments.latestHeading)
-               : AudioRuntime.hasTrack
-                 ? AuroraI18n.text("home.currentSession")
-                 : AuroraI18n.text("home.latestFallback")
-        periodLabel: root.showingLatestMoment
-                     ? AuroraI18n.momentPeriod(Moments.latestPeriodLabel)
-                     : AudioRuntime.hasTrack
-                       ? AuroraI18n.text("home.now")
-                       : AuroraI18n.text("home.lateNight")
-        trackTitle: root.showingLatestMoment
-                    ? Moments.latestTitle
-                    : AudioRuntime.hasTrack
-                      ? AudioRuntime.title
-                      : AuroraI18n.text("demo.track")
-        artist: root.showingLatestMoment
-                ? Moments.latestArtist
-                : AudioRuntime.hasTrack
-                  ? root.homeArtistLine
-                  : AuroraI18n.text("demo.artist")
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.horizontalCenterOffset: root.width >= 980 ? root.width * 0.17 : 0
+        anchors.verticalCenterOffset: 12
+        sizePreset: 1
+        heroHomeMode: true
+        title: root.homeHeading
+        periodLabel: root.homePeriod
+        trackTitle: root.homeTitle
+        artist: root.homeArtist
         artworkSource: root.showingLatestMoment
                        ? Moments.latestArtworkSource
                        : AudioRuntime.hasTrack
                          ? AudioRuntime.artworkSource
                          : "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
-        emotionColor: root.showingLatestMoment
-                      ? Moments.latestIdentityColor
-                      : AudioRuntime.hasTrack && AudioRuntime.identityColorAvailable
-                        ? AudioRuntime.identityColor
-                        : AuroraTokens.coolAccent
-        confirmedUserNote: root.showingLatestMoment
-                           ? Moments.latestConfirmedMeaning
-                           : ""
+        emotionColor: root.homeIdentityColor
+        confirmedUserNote: root.homeMeaning
         availability: root.showingLatestMoment && !Moments.latestAvailable
                       ? AuroraTypes.AvailabilityDetached
                       : AuroraTypes.AvailabilityActive
@@ -155,7 +218,7 @@ Item {
                          ? AuroraTypes.MomentRecalling
                          : root.showingLatestMoment
                            ? Moments.latestAvailable
-                             ? Moments.latestConfirmedMeaning.length > 0
+                             ? root.homeMeaning.length > 0
                                ? AuroraTypes.MomentMeaningful
                                : AuroraTypes.MomentRemembered
                              : AuroraTypes.MomentDetached
@@ -166,6 +229,7 @@ Item {
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
         mangaMode: true
+
         onActivated: {
             if (root.showingLatestMoment)
                 root.recallLatestMoment()
@@ -181,18 +245,35 @@ Item {
         onRelinkRequested: root.openMusicSpace()
     }
 
+    Text {
+        anchors.horizontalCenter: currentMoment.horizontalCenter
+        anchors.top: currentMoment.bottom
+        anchors.topMargin: -28
+        text: root.homePeriod
+        color: AuroraTokens.mangaMuted
+        opacity: root.transitioning ? 0.0 : 0.72
+        font.pixelSize: 13
+        font.letterSpacing: 1.2
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: AuroraTokens.motionSoft
+                easing.type: Easing.OutCubic
+            }
+        }
+    }
+
     Rectangle {
         anchors.right: parent.right
-        anchors.rightMargin: 172
         anchors.top: parent.top
-        anchors.topMargin: 28
+        anchors.margins: 28
         width: 132
         height: 42
         radius: 21
         color: AuroraTokens.mangaPanel
         border.width: 2
         border.color: Moments.hasMoment
-                      ? Moments.latestIdentityColor
+                      ? root.homeIdentityColor
                       : AuroraTokens.mangaInk
 
         Text {
@@ -209,27 +290,5 @@ Item {
             enabled: Moments.hasMoment
             onTapped: root.openMemoryFlow()
         }
-    }
-
-    Rectangle {
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.margins: 28
-        width: 132
-        height: 42
-        visible: false
-        radius: 21
-        color: Qt.rgba(1, 1, 1, 0.07)
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.10)
-
-        Text {
-            anchors.centerIn: parent
-            text: "Component Gallery"
-            color: AuroraTokens.textSecondary
-            font.pixelSize: 13
-        }
-
-        TapHandler { onTapped: root.openGallery() }
     }
 }

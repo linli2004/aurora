@@ -19,6 +19,8 @@ Item {
     readonly property bool reducedMotion:
         accessibilityMode === AuroraTypes.ReducedMotion
         || accessibilityMode === AuroraTypes.CognitiveMinimal
+    readonly property real transitionPulse:
+        Math.sin(Math.max(0.0, Math.min(1.0, progress)) * Math.PI)
     readonly property real resolvedSize:
         fromRect.width + (toRect.width - fromRect.width) * progress
     readonly property real resolvedX:
@@ -37,7 +39,7 @@ Item {
         progressAnimation.to = 1.0
         progressAnimation.duration = reducedMotion
                                      ? AuroraTokens.motionSoft
-                                     : AuroraTokens.motionPresence
+                                     : 1120
         progressAnimation.start()
     }
 
@@ -48,28 +50,67 @@ Item {
         progressAnimation.to = 0.0
         progressAnimation.duration = reducedMotion
                                      ? AuroraTokens.motionSoft
-                                     : AuroraTokens.motionFlow
+                                     : 900
         progressAnimation.start()
     }
 
     Rectangle {
+        anchors.fill: parent
+        color: root.colorSignature
+        opacity: root.reducedMotion ? 0.0 : root.transitionPulse * 0.075
+    }
+
+    Repeater {
+        model: root.reducedMotion || root.qualityMode === AuroraTypes.Eco ? 1 : 3
+
+        delegate: Rectangle {
+            required property int index
+
+            x: root.resolvedX
+               - root.resolvedSize * (0.10 + index * 0.065)
+            y: root.resolvedY
+               - root.resolvedSize * (0.10 + index * 0.065)
+            width: root.resolvedSize * (1.20 + index * 0.13)
+            height: width
+            radius: width * (0.22 + index * 0.016)
+            color: "transparent"
+            border.width: index === 0 ? 2 : 1
+            border.color: Qt.rgba(root.colorSignature.r,
+                                  root.colorSignature.g,
+                                  root.colorSignature.b,
+                                  0.18 - index * 0.035
+                                  + root.transitionPulse * 0.10)
+            opacity: root.reducedMotion
+                     ? 0.18
+                     : 0.34 + root.transitionPulse * (0.28 - index * 0.04)
+            rotation: root.reducedMotion
+                      ? 0
+                      : (index % 2 === 0 ? -1 : 1)
+                        * (7 + index * 5)
+                        * root.transitionPulse
+            scale: 1.0 + root.transitionPulse * (0.035 + index * 0.012)
+        }
+    }
+
+    Rectangle {
         id: identityHalo
-        x: root.resolvedX - root.resolvedSize * 0.10
-        y: root.resolvedY - root.resolvedSize * 0.10
-        width: root.resolvedSize * 1.20
+        x: root.resolvedX - root.resolvedSize * 0.12
+        y: root.resolvedY - root.resolvedSize * 0.12
+        width: root.resolvedSize * 1.24
         height: width
-        radius: width * 0.18
+        radius: width * 0.24
         color: root.colorSignature
         opacity: root.reducedMotion
-                 ? 0.04
-                 : 0.04 + Math.sin(root.progress * Math.PI) * 0.10
+                 ? 0.035
+                 : 0.035 + root.transitionPulse * 0.10
         scale: root.reducedMotion
                ? 1.0
-               : 0.96 + Math.sin(root.progress * Math.PI) * 0.08
+               : 0.96 + root.transitionPulse * 0.10
     }
 
     AuroraCrystal {
         id: transitionCrystal
+
         x: root.resolvedX
         y: root.resolvedY
         crystalSize: root.resolvedSize
@@ -78,10 +119,19 @@ Item {
         artworkSource: root.artworkSource
         colorSignature: root.colorSignature
         experienceState: AuroraTypes.CrystalTransitioning
-        context: root.progress < 0.5 ? AuroraTypes.Moment : AuroraTypes.MusicSpace
+        context: root.progress < 0.46
+                 ? AuroraTypes.Moment
+                 : AuroraTypes.MusicSpace
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
-        heroMode: root.progress >= 0.42
+        heroMode: true
+        mangaMode: true
+        scale: root.reducedMotion
+               ? 1.0
+               : 0.97 + root.transitionPulse * 0.075
+        rotation: root.reducedMotion
+                  ? 0
+                  : -1.2 + root.progress * 2.4
     }
 
     NumberAnimation {
