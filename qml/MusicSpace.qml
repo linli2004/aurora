@@ -20,9 +20,13 @@ Item {
     property bool momentFeedbackVisible: false
     property bool appendResolvedSource: false
     property bool transitionCrystalSettling: false
+    property bool presentationMode: false
     property real presencePhase: 0.0
 
+    readonly property bool compactViewport: width < 1080 || height < 700
     readonly property bool cinematicWide: width >= 920
+    readonly property bool performanceConstrained:
+        root.qualityMode === AuroraTypes.Eco || root.compactViewport
     readonly property real presenceStrength:
         Math.max(0.0, Math.min(1.0,
             0.26
@@ -219,9 +223,11 @@ Item {
     NumberAnimation on presencePhase {
         from: 0.0
         to: Math.PI * 2.0
-        duration: 18000
+        duration: root.qualityMode === AuroraTypes.Immersive ? 15000 : 21000
         loops: Animation.Infinite
-        running: root.visible && !root.reducedMotion
+        running: root.visible
+                 && !root.reducedMotion
+                 && root.qualityMode !== AuroraTypes.Eco
     }
 
     focus: visible
@@ -306,7 +312,7 @@ Item {
 
     Timer {
         id: controlHideTimer
-        interval: 3200
+        interval: root.presentationMode ? 2400 : 3200
         repeat: false
         onTriggered: {
             if (!root.forceControlsVisible
@@ -911,14 +917,17 @@ Item {
         id: sourceStudioPanel
 
         anchors.right: parent.right
-        anchors.rightMargin: 28
+        anchors.rightMargin: root.compactViewport ? 18 : 28
         anchors.top: sourceButton.bottom
         anchors.topMargin: 10
-        width: Math.min(486, root.width - 56)
-        height: Math.min(414, root.height - 112)
+        width: Math.min(root.compactViewport ? 430 : 486,
+                        root.width - (root.compactViewport ? 36 : 56))
+        height: Math.min(root.compactViewport ? 382 : 414,
+                         root.height - (root.compactViewport ? 94 : 112))
         visible: root.sourcePanelExpanded
         enabled: root.sourcePanelExpanded
         opacity: root.sourcePanelExpanded ? 1.0 : 0.0
+        scale: root.sourcePanelExpanded ? 1.0 : 0.975
         radius: 14
         color: Qt.rgba(AuroraTokens.mangaPanel.r,
                        AuroraTokens.mangaPanel.g,
@@ -935,6 +944,42 @@ Item {
             }
         }
 
+        Behavior on scale {
+            NumberAnimation {
+                duration: 280
+                easing.type: Easing.OutQuint
+            }
+        }
+
+        Rectangle {
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.rightMargin: 12
+            anchors.topMargin: 12
+            width: 30
+            height: 30
+            radius: 15
+            color: Qt.rgba(AuroraTokens.mangaPaper.r,
+                           AuroraTokens.mangaPaper.g,
+                           AuroraTokens.mangaPaper.b,
+                           0.72)
+            border.width: 1
+            border.color: Qt.rgba(AuroraTokens.mangaInk.r,
+                                  AuroraTokens.mangaInk.g,
+                                  AuroraTokens.mangaInk.b,
+                                  0.22)
+            z: 4
+
+            Text {
+                anchors.centerIn: parent
+                text: "×"
+                color: root.mangaText
+                font.pixelSize: 18
+            }
+
+            TapHandler { onTapped: root.sourcePanelExpanded = false }
+        }
+
         Column {
             anchors.fill: parent
             anchors.margins: 16
@@ -946,7 +991,7 @@ Item {
                 spacing: 10
 
                 Column {
-                    width: parent.width - 124
+                    width: parent.width - 156
                     spacing: 3
 
                     Text {
@@ -1881,10 +1926,18 @@ Item {
         id: playerContent
 
         anchors.fill: parent
-        anchors.leftMargin: root.controlsVisible ? 72 : 48
-        anchors.rightMargin: root.controlsVisible ? 72 : 48
-        anchors.topMargin: root.controlsVisible ? 62 : 48
-        anchors.bottomMargin: root.controlsVisible ? 58 : 42
+        anchors.leftMargin: root.compactViewport
+                            ? (root.controlsVisible ? 44 : 30)
+                            : (root.controlsVisible ? 72 : 48)
+        anchors.rightMargin: root.compactViewport
+                             ? (root.controlsVisible ? 44 : 30)
+                             : (root.controlsVisible ? 72 : 48)
+        anchors.topMargin: root.compactViewport
+                           ? (root.controlsVisible ? 54 : 34)
+                           : (root.controlsVisible ? 62 : 48)
+        anchors.bottomMargin: root.compactViewport
+                              ? (root.controlsVisible ? 50 : 34)
+                              : (root.controlsVisible ? 58 : 42)
         opacity: !liquidTrackTransition.running
                  ? 1.0
                  : root.transitionLanding ? 1.0 : 0.02
@@ -1893,10 +1946,12 @@ Item {
                : root.transitionLanding ? 1.0 : 0.972
         z: 4
 
-        readonly property bool wide: width >= 820
+        readonly property bool wide: width >= 760
         readonly property real resolvedCrystalSize:
             wide
-            ? Math.min(root.controlsVisible ? 372 : 432,
+            ? Math.min(root.compactViewport
+                       ? (root.controlsVisible ? 330 : 382)
+                       : (root.controlsVisible ? 372 : 432),
                        height * (root.controlsVisible ? 0.62 : 0.72))
             : Math.min(root.controlsVisible ? 340 : 390,
                        width * 0.72,
@@ -2203,7 +2258,7 @@ Item {
                 anchors.leftMargin: root.controlsVisible ? 52 : parent.width * 0.22
                 anchors.rightMargin: root.controlsVisible ? 52 : parent.width * 0.22
                 anchors.verticalCenter: parent.verticalCenter
-                height: root.controlsVisible ? 5 : 2
+                height: root.controlsVisible ? (root.presentationMode ? 4 : 5) : 2
                 radius: height / 2
                 opacity: root.controlsVisible ? 1.0 : AudioRuntime.hasTrack ? 0.42 : 0.0
                 color: Qt.rgba(AuroraTokens.mangaInk.r,
@@ -2290,6 +2345,39 @@ Item {
 
             Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
             Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+        }
+    }
+
+    Rectangle {
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: 28
+        anchors.bottomMargin: 22
+        width: 178
+        height: 30
+        radius: 15
+        color: Qt.rgba(AuroraTokens.mangaPaper.r,
+                       AuroraTokens.mangaPaper.g,
+                       AuroraTokens.mangaPaper.b,
+                       0.70)
+        border.width: 1
+        border.color: Qt.rgba(AuroraTokens.mangaInk.r,
+                              AuroraTokens.mangaInk.g,
+                              AuroraTokens.mangaInk.b,
+                              0.14)
+        visible: root.controlsVisible && !root.presentationMode
+        opacity: visible ? 0.72 : 0.0
+        z: 18
+
+        Text {
+            anchors.centerIn: parent
+            text: AuroraI18n.text("demo.presentationHint")
+            color: root.mangaMutedText
+            font.pixelSize: 10
+        }
+
+        Behavior on opacity {
+            NumberAnimation { duration: AuroraTokens.motionSoft; easing.type: Easing.OutCubic }
         }
     }
 

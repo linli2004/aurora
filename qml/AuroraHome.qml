@@ -8,7 +8,10 @@ Item {
     property int qualityMode: AuroraTypes.Balanced
     property bool identityVisible: true
     property bool transitioning: false
+    property bool presentationMode: false
     property real entryPhase: 0.0
+
+    readonly property bool compactViewport: width < 1080 || height < 690
 
     readonly property bool showingLatestMoment:
         Moments.hasMoment
@@ -72,6 +75,7 @@ Item {
         running: root.visible
                  && !root.transitioning
                  && root.accessibilityMode === AuroraTypes.AccessibilityNormal
+                 && root.qualityMode !== AuroraTypes.Eco
     }
 
     MangaBackdrop {
