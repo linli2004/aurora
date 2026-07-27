@@ -7,6 +7,7 @@ Item {
     property int currentPage: 0 // 0 Home, 1 Music Space, 2 Gallery, 3 Memory
     property int accessibilityMode: AuroraTypes.AccessibilityNormal
     property int qualityMode: AuroraTypes.Balanced
+    property bool presentationMode: false
     property int transitionOriginPage: 0
     property int musicReturnPage: 0
     property rect transitionStartRect: Qt.rect(0, 0, 0, 0)
@@ -121,6 +122,7 @@ Item {
                        && root.transitionOriginPage === 0
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
+        presentationMode: root.presentationMode
         onOpenMusicSpace: root.enterMusicSpace()
         onRecallLatestMoment: root.recallLatestMoment()
         onOpenMemoryFlow: {
@@ -153,6 +155,7 @@ Item {
         transitioning: identityTransitionRunning
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
+        presentationMode: root.presentationMode
         onCloseRequested: root.leaveMusicSpace()
 
         Behavior on opacity {
@@ -202,6 +205,7 @@ Item {
                        && root.transitionOriginPage === 3
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
+        presentationMode: root.presentationMode
         onCloseRequested: root.currentPage = 0
         onRecallMoment: momentId => root.recallMoment(momentId, 3)
         onManageSourcesRequested: {
@@ -232,13 +236,64 @@ Item {
         colorSignature: root.transitionIdentityColor
     }
 
+    Shortcut {
+        sequence: "Ctrl+H"
+        enabled: !root.identityTransitionRunning
+        onActivated: root.currentPage = 0
+    }
+
+    Shortcut {
+        sequence: "Ctrl+M"
+        enabled: Moments.hasMoment && !root.identityTransitionRunning
+        onActivated: {
+            Moments.selectMoment(Moments.latestMomentId)
+            root.currentPage = 3
+        }
+    }
+
+    Rectangle {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 18
+        width: 164
+        height: 30
+        radius: 15
+        color: Qt.rgba(AuroraTokens.mangaPaper.r,
+                       AuroraTokens.mangaPaper.g,
+                       AuroraTokens.mangaPaper.b,
+                       0.76)
+        border.width: 1
+        border.color: Qt.rgba(AuroraTokens.mangaInk.r,
+                              AuroraTokens.mangaInk.g,
+                              AuroraTokens.mangaInk.b,
+                              0.16)
+        visible: !root.presentationMode
+                 && root.currentPage === 0
+                 && !root.identityTransitionRunning
+        opacity: visible ? 0.72 : 0.0
+        z: 490
+
+        Text {
+            anchors.centerIn: parent
+            text: AuroraI18n.text("demo.presentationHint")
+            color: AuroraTokens.mangaMuted
+            font.pixelSize: 10
+            font.letterSpacing: 0.5
+        }
+
+        Behavior on opacity {
+            NumberAnimation { duration: AuroraTokens.motionSoft; easing.type: Easing.OutCubic }
+        }
+    }
+
     MangaLanguageToggle {
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.leftMargin: 28
         anchors.bottomMargin: 26
         z: 500
-        visible: root.currentPage === 0 || root.currentPage === 3
+        visible: !root.presentationMode
+                 && (root.currentPage === 0 || root.currentPage === 3)
         opacity: root.identityTransitionRunning ? 0.0 : 1.0
 
         Behavior on opacity {

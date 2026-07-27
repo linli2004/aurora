@@ -9,7 +9,9 @@ Item {
     property bool identityVisible: true
     property bool transitioning: false
     property bool memoryPanelExpanded: false
+    property bool presentationMode: false
 
+    readonly property bool compactViewport: width < 1100 || height < 700
     readonly property bool hasSelection: Moments.selectedMomentId.length > 0
     readonly property bool selectedDetached:
         root.hasSelection && !Moments.selectedAvailable
@@ -73,7 +75,7 @@ Item {
     Rectangle {
         anchors.left: parent.left
         anchors.top: parent.top
-        anchors.margins: 28
+        anchors.margins: root.compactViewport ? 20 : 28
         width: 88
         height: 42
         radius: 8
@@ -96,7 +98,7 @@ Item {
     Row {
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.margins: 28
+        anchors.margins: root.compactViewport ? 20 : 28
         height: 42
         spacing: 10
         z: 20

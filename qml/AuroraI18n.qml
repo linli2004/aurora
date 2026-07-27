@@ -58,6 +58,8 @@ QtObject {
         case "home.currentRoom": return "此刻的音樂"
         case "home.now": return "現在"
         case "home.lateNight": return "深夜"
+        case "demo.presentationHint": return "F11 · 全螢幕展示"
+        case "demo.rcReady": return "Demo 已準備"
         case "demo.track": return "失眠"
         case "demo.artist": return "Suki 劉舒好"
         case "music.back": return "返回"

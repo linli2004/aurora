@@ -96,7 +96,7 @@ FocusScope {
     NumberAnimation on ambientPhase {
         from: 0.0
         to: Math.PI * 2.0
-        duration: 11000
+        duration: root.qualityMode === AuroraTypes.Immersive ? 9200 : 12800
         loops: Animation.Infinite
         running: root.heroMode && root.motionEnabled
     }
@@ -288,7 +288,9 @@ FocusScope {
         }
 
         Repeater {
-            model: root.heroMode && root.mangaMode ? 8 : 0
+            model: root.heroMode && root.mangaMode
+                   ? (root.qualityMode === AuroraTypes.Eco ? 2 : 6)
+                   : 0
 
             delegate: Rectangle {
                 required property int index
@@ -378,7 +380,7 @@ FocusScope {
                 width: parent.width * 0.68
                 text: root.title.length > 0 ? root.title.charAt(0).toUpperCase() : "A"
                 color: root.mangaMode ? AuroraTokens.mangaInk : AuroraTokens.textPrimary
-                font.pixelSize: parent.width * 0.30
+                font.pixelSize: parent.width * (root.heroMode ? 0.24 : 0.30)
                 font.weight: Font.DemiBold
                 horizontalAlignment: Text.AlignHCenter
             }
@@ -443,6 +445,37 @@ FocusScope {
                                     AuroraTokens.mangaInk.b,
                                     0.28)
                           : Qt.rgba(1, 1, 1, 0.07)
+        }
+
+        Repeater {
+            model: (!root.hasArtwork || root.unavailable) && root.heroMode
+                   ? (root.qualityMode === AuroraTypes.Eco ? 2 : 4)
+                   : 0
+
+            delegate: Rectangle {
+                required property int index
+
+                width: parent.width * (0.12 + index * 0.035)
+                height: width
+                radius: width / 2
+                x: parent.width * (0.18 + index * 0.17)
+                y: parent.height * (0.74 - index * 0.045)
+                color: index % 2 === 0
+                       ? Qt.rgba(AuroraTokens.mangaPaper.r,
+                                 AuroraTokens.mangaPaper.g,
+                                 AuroraTokens.mangaPaper.b,
+                                 0.20)
+                       : Qt.rgba(root.colorSignature.r,
+                                 root.colorSignature.g,
+                                 root.colorSignature.b,
+                                 0.26)
+                border.width: 1
+                border.color: Qt.rgba(AuroraTokens.mangaInk.r,
+                                      AuroraTokens.mangaInk.g,
+                                      AuroraTokens.mangaInk.b,
+                                      0.18)
+                opacity: 0.58
+            }
         }
 
         Rectangle {

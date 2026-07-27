@@ -21,12 +21,18 @@ Item {
         || accessibilityMode === AuroraTypes.CognitiveMinimal
     readonly property real transitionPulse:
         Math.sin(Math.max(0.0, Math.min(1.0, progress)) * Math.PI)
+    readonly property real travelProgress:
+        progress < 0.5
+        ? 4.0 * progress * progress * progress
+        : 1.0 - Math.pow(-2.0 * progress + 2.0, 3.0) / 2.0
+    readonly property real transitionLift:
+        reducedMotion ? 0.0 : -Math.sin(progress * Math.PI) * height * 0.028
     readonly property real resolvedSize:
-        fromRect.width + (toRect.width - fromRect.width) * progress
+        fromRect.width + (toRect.width - fromRect.width) * travelProgress
     readonly property real resolvedX:
-        fromRect.x + (toRect.x - fromRect.x) * progress
+        fromRect.x + (toRect.x - fromRect.x) * travelProgress
     readonly property real resolvedY:
-        fromRect.y + (toRect.y - fromRect.y) * progress
+        fromRect.y + (toRect.y - fromRect.y) * travelProgress + transitionLift
 
     visible: progressAnimation.running
     enabled: false
@@ -39,7 +45,7 @@ Item {
         progressAnimation.to = 1.0
         progressAnimation.duration = reducedMotion
                                      ? AuroraTokens.motionSoft
-                                     : 1280
+                                     : 1120
         progressAnimation.start()
     }
 
@@ -50,14 +56,14 @@ Item {
         progressAnimation.to = 0.0
         progressAnimation.duration = reducedMotion
                                      ? AuroraTokens.motionSoft
-                                     : 980
+                                     : 860
         progressAnimation.start()
     }
 
     Rectangle {
         anchors.fill: parent
         color: root.colorSignature
-        opacity: root.reducedMotion ? 0.0 : root.transitionPulse * 0.075
+        opacity: root.reducedMotion ? 0.0 : root.transitionPulse * 0.062
     }
 
     Item {
@@ -158,10 +164,10 @@ Item {
         mangaMode: true
         scale: root.reducedMotion
                ? 1.0
-               : 0.97 + root.transitionPulse * 0.075
+               : 0.965 + root.transitionPulse * 0.070
         rotation: root.reducedMotion
                   ? 0
-                  : -1.2 + root.progress * 2.4
+                  : -0.8 + root.travelProgress * 1.6
     }
 
     Column {
@@ -206,7 +212,7 @@ Item {
         id: progressAnimation
         target: root
         property: "progress"
-        easing.type: Easing.InOutCubic
+        easing.type: Easing.Linear
         onFinished: root.transitionFinished(root.progress >= 0.999)
     }
 }
