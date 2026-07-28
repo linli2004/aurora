@@ -6,7 +6,12 @@ Item {
 
     property int currentPage: 0 // 0 Home, 1 Music Space, 2 Gallery, 3 Memory
     property int accessibilityMode: AuroraTypes.AccessibilityNormal
-    property int qualityMode: AuroraTypes.Balanced
+    property int qualityMode:
+        Qt.application.arguments.indexOf("--eco") >= 0
+        ? AuroraTypes.Eco
+        : Qt.application.arguments.indexOf("--immersive") >= 0
+          ? AuroraTypes.Immersive
+          : AuroraTypes.Balanced
     property bool presentationMode: false
     property int transitionOriginPage: 0
     property int musicReturnPage: 0
