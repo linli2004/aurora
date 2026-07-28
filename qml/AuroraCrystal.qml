@@ -200,7 +200,7 @@ FocusScope {
                              root.colorSignature.g,
                              root.colorSignature.b,
                              0.26)
-            border.width: root.framedArtwork ? 3 : 0
+            border.width: root.framedArtwork ? (root.mangaMode ? 2 : 1) : 0
             border.color: root.mangaMode
                           ? Qt.rgba(AuroraTokens.mangaInk.r,
                                     AuroraTokens.mangaInk.g,
@@ -213,7 +213,7 @@ FocusScope {
                 anchors.fill: parent
                 anchors.margins: root.framedArtwork ? parent.width * 0.018 : 0
                 source: root.artworkSource
-                fillMode: Image.PreserveAspectCrop
+                fillMode: Image.PreserveAspectFit
                 asynchronous: true
             }
 
@@ -375,14 +375,58 @@ FocusScope {
                 rotation: 18
             }
 
-            Text {
+            Column {
                 anchors.centerIn: parent
-                width: parent.width * 0.68
-                text: root.title.length > 0 ? root.title.charAt(0).toUpperCase() : "A"
-                color: root.mangaMode ? AuroraTokens.mangaInk : AuroraTokens.textPrimary
-                font.pixelSize: parent.width * (root.heroMode ? 0.24 : 0.30)
-                font.weight: Font.DemiBold
-                horizontalAlignment: Text.AlignHCenter
+                width: parent.width * 0.66
+                spacing: root.heroMode ? parent.height * 0.025 : 4
+
+                Text {
+                    width: parent.width
+                    text: root.title.length > 0
+                          ? root.title.charAt(0).toUpperCase()
+                          : "A"
+                    color: root.mangaMode
+                           ? AuroraTokens.mangaInk
+                           : AuroraTokens.textPrimary
+                    font.pixelSize: identitySurface.width
+                                    * (root.heroMode ? 0.18 : 0.24)
+                    font.weight: Font.DemiBold
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: parent.width * 0.34
+                    height: root.heroMode ? 2 : 1
+                    radius: height / 2
+                    color: root.mangaMode
+                           ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                     AuroraTokens.mangaInk.g,
+                                     AuroraTokens.mangaInk.b,
+                                     0.34)
+                           : Qt.rgba(1, 1, 1, 0.28)
+                }
+
+                Text {
+                    width: parent.width
+                    text: root.artist.length > 0
+                          && root.artist !== "Local audio"
+                          && root.artist !== "Online source"
+                          ? root.artist
+                          : "Aurora identity"
+                    color: root.mangaMode
+                           ? Qt.rgba(AuroraTokens.mangaInk.r,
+                                     AuroraTokens.mangaInk.g,
+                                     AuroraTokens.mangaInk.b,
+                                     0.68)
+                           : Qt.rgba(1, 1, 1, 0.66)
+                    font.pixelSize: Math.max(11,
+                                             identitySurface.width
+                                             * (root.heroMode ? 0.038 : 0.050))
+                    font.letterSpacing: root.heroMode ? 1.4 : 0.6
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
+                }
             }
         }
 

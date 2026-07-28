@@ -2348,39 +2348,6 @@ Item {
         }
     }
 
-    Rectangle {
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.rightMargin: 28
-        anchors.bottomMargin: 22
-        width: 178
-        height: 30
-        radius: 15
-        color: Qt.rgba(AuroraTokens.mangaPaper.r,
-                       AuroraTokens.mangaPaper.g,
-                       AuroraTokens.mangaPaper.b,
-                       0.70)
-        border.width: 1
-        border.color: Qt.rgba(AuroraTokens.mangaInk.r,
-                              AuroraTokens.mangaInk.g,
-                              AuroraTokens.mangaInk.b,
-                              0.14)
-        visible: root.controlsVisible && !root.presentationMode
-        opacity: visible ? 0.72 : 0.0
-        z: 18
-
-        Text {
-            anchors.centerIn: parent
-            text: AuroraI18n.text("demo.presentationHint")
-            color: root.mangaMutedText
-            font.pixelSize: 10
-        }
-
-        Behavior on opacity {
-            NumberAnimation { duration: AuroraTokens.motionSoft; easing.type: Easing.OutCubic }
-        }
-    }
-
     LiquidTrackTransition {
         id: liquidTrackTransition
         anchors.fill: parent

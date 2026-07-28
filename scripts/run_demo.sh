@@ -3,11 +3,30 @@ set -euo pipefail
 
 pkill -x aurora 2>/dev/null || true
 
-if command -v gtk-launch >/dev/null 2>&1; then
-    gtk-launch aurora
-else
-    exec "${HOME}/.local/bin/aurora"
+quality="${AURORA_DEMO_QUALITY:-balanced}"
+args=(--presentation)
+
+case "${quality}" in
+    eco)
+        args+=(--eco)
+        ;;
+    immersive)
+        args+=(--immersive)
+        ;;
+    balanced)
+        ;;
+    *)
+        printf 'Unknown AURORA_DEMO_QUALITY=%s; using balanced.\n' "${quality}" >&2
+        ;;
+esac
+
+if [[ -x "${HOME}/.local/bin/aurora" ]]; then
+    exec "${HOME}/.local/bin/aurora" "${args[@]}"
 fi
 
-printf '%s
-' "Aurora Demo launched. Press F11 for presentation mode."
+if command -v aurora >/dev/null 2>&1; then
+    exec aurora "${args[@]}"
+fi
+
+printf 'Aurora is not installed. Run ./scripts/demo_preflight.sh first.\n' >&2
+exit 1
