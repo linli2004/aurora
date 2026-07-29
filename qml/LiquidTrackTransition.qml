@@ -367,10 +367,11 @@ Item {
                 }
             }
 
-            // Switch while the old identity is still dominant and the incoming
-            // identity is almost invisible, preventing metadata popping.
+            // Switch only the lightweight queue identity here. The player
+            // source is committed by MusicSpace after the transition frame
+            // has completed, so QMediaPlayer loading cannot stall the motion.
             SequentialAnimation {
-                PauseAnimation { duration: root.transitionDuration * 0.14 }
+                PauseAnimation { duration: root.transitionDuration * 0.18 }
                 ScriptAction { script: root.switchRequested(root.transitionDirection) }
             }
 

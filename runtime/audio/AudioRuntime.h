@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QUrl>
 #include <QVariantList>
+#include <QVariantMap>
 
 #include <QAudioBufferOutput>
 #include <QAudioOutput>
@@ -112,6 +113,12 @@ public:
     Q_INVOKABLE void previous();
     Q_INVOKABLE void seekRelative(qint64 deltaMilliseconds);
     Q_INVOKABLE void clearMediaCache();
+    Q_INVOKABLE int wrappedQueueIndex(int direction) const;
+    Q_INVOKABLE QVariantMap queueTrackMetadata(int index) const;
+    Q_INVOKABLE void warmQueueIndex(int index);
+    Q_INVOKABLE void beginDeferredQueueStep(int direction);
+    Q_INVOKABLE void commitDeferredPlayback(bool autoplay);
+    Q_INVOKABLE void reconcileOnlineTrackCache(const QVariantList &tracks);
 
 public slots:
     void setPosition(qint64 position);
@@ -137,9 +144,11 @@ private:
     QList<QUrl> urlsFromSourceText(const QString &sourceText) const;
     QList<QUrl> urlsFromMetadataTracks(
         const QVariantList &tracks,
-        QHash<QString, LocalTrackIdentity> *identityOverrides) const;
+        QHash<QString, LocalTrackIdentity> *identityOverrides,
+        QHash<QString, QString> *cacheCatalogKeys) const;
     void loadCurrent(bool autoplay, qint64 initialPosition = -1);
     [[nodiscard]] LocalTrackIdentity identityOverrideFor(const QUrl &url) const;
+    [[nodiscard]] QString cacheCatalogKeyFor(const QUrl &url) const;
     void applyPendingSessionPosition();
     void applyTrackIdentity(const LocalTrackIdentity &identity);
     void refreshTrackIdentity();
@@ -157,8 +166,10 @@ private:
     QTimer m_restorePositionTimer;
     AudioQueue m_queue;
     QHash<QString, LocalTrackIdentity> m_queueIdentityOverrides;
+    QHash<QString, QString> m_queueCacheCatalogKeys;
     LocalTrackIdentity m_trackIdentity;
     QString m_errorString;
     qint64 m_pendingRestorePosition = -1;
     int m_restorePositionAttempts = 0;
+    bool m_deferredPlaybackPending = false;
 };

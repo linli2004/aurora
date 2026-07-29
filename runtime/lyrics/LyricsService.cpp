@@ -106,6 +106,30 @@ void LyricsService::rememberTracks(const QVariantList &tracks)
     }
 }
 
+void LyricsService::warmForTracks(const QVariantList &tracks)
+{
+    rememberTracks(tracks);
+
+    for (const QVariant &trackValue : tracks) {
+        const QVariantMap track = trackValue.toMap();
+
+        TrackHint hint;
+        hint.provider = track.value(QStringLiteral("source")).toString().trimmed();
+        hint.songId = track.value(QStringLiteral("songId")).toString().trimmed();
+        if (hint.provider.isEmpty() || hint.songId.isEmpty())
+            continue;
+
+        if (hint.provider != QStringLiteral("wy"))
+            continue;
+
+        const QString path = cachedLyricsPath(hint);
+        if (QFileInfo::exists(path) || m_warmReplies.contains(path))
+            continue;
+
+        requestWarmOnlineLyrics(hint);
+    }
+}
+
 bool LyricsService::loadForSource(const QUrl &source)
 {
     ++m_generation;
@@ -323,6 +347,68 @@ void LyricsService::requestOnlineLyrics(
         m_errorString.clear();
         emit lyricsChanged();
         emit statusChanged();
+    });
+}
+
+void LyricsService::requestWarmOnlineLyrics(
+    const TrackHint &hint)
+{
+    const QUrl endpoint(QStringLiteral(
+        "https://music.163.com/api/song/lyric?id=%1&lv=1&kv=1&tv=-1")
+        .arg(hint.songId));
+
+    QNetworkRequest request(endpoint);
+    request.setAttribute(
+        QNetworkRequest::RedirectPolicyAttribute,
+        QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setRawHeader("User-Agent", "Mozilla/5.0 Aurora/1.0");
+    request.setRawHeader("Referer", "https://music.163.com/");
+
+    const QString path = cachedLyricsPath(hint);
+    QNetworkReply *reply = m_network->get(request);
+    m_warmReplies.insert(path, reply);
+
+    connect(reply, &QNetworkReply::downloadProgress,
+            this, [reply](qint64 received, qint64 total) {
+        if (received > maximumLyricsBytes || total > maximumLyricsBytes)
+            reply->abort();
+    });
+
+    QTimer::singleShot(lyricsTimeoutMs, reply, [reply] {
+        if (reply->isRunning())
+            reply->abort();
+    });
+
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, path] {
+        if (m_warmReplies.value(path) == reply)
+            m_warmReplies.remove(path);
+
+        const QByteArray bytes = reply->error() == QNetworkReply::NoError
+            ? reply->readAll()
+            : QByteArray();
+        reply->deleteLater();
+
+        if (bytes.isEmpty()
+            || bytes.size() > maximumLyricsBytes
+            || QFileInfo::exists(path)) {
+            return;
+        }
+
+        const QJsonDocument document = QJsonDocument::fromJson(bytes);
+        const QJsonObject root = document.object();
+        const QString lrc = root.value(QStringLiteral("lrc"))
+            .toObject()
+            .value(QStringLiteral("lyric"))
+            .toString();
+
+        if (parseLrc(lrc).isEmpty())
+            return;
+
+        QDir().mkpath(QFileInfo(path).absolutePath());
+        QFile cache(path);
+        if (cache.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+            cache.write(lrc.toUtf8());
     });
 }
 

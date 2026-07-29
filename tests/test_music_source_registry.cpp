@@ -95,6 +95,7 @@ void MusicSourceRegistryTest::exposesDefaultOnlineTracks()
     QCOMPARE(firstTrack.value(QStringLiteral("source")).toString(), QStringLiteral("wy"));
     QVERIFY(!firstTrack.value(QStringLiteral("songId")).toString().isEmpty());
     QVERIFY(!firstTrack.value(QStringLiteral("title")).toString().isEmpty());
+    QVERIFY(!firstTrack.value(QStringLiteral("artworkUrl")).toString().isEmpty());
     QVERIFY(firstTrack.value(QStringLiteral("requestText")).toString().startsWith(QStringLiteral("wy:")));
 }
 
@@ -197,6 +198,8 @@ void MusicSourceRegistryTest::resolvesMockOnlineTrackMusicUrl()
     QCOMPARE(resolvedTrack.value(QStringLiteral("url")).toString(), QStringLiteral("https://example.com/online.mp3"));
     QCOMPARE(resolvedTrack.value(QStringLiteral("title")).toString(), catalogTrack.value(QStringLiteral("title")).toString());
     QCOMPARE(resolvedTrack.value(QStringLiteral("artist")).toString(), catalogTrack.value(QStringLiteral("artist")).toString());
+    QCOMPARE(resolvedTrack.value(QStringLiteral("artworkUrl")).toString(),
+             catalogTrack.value(QStringLiteral("artworkUrl")).toString());
     QVERIFY(!registry.resolving());
 }
 
@@ -250,6 +253,8 @@ void MusicSourceRegistryTest::resolvesMockOnlinePlaylistWithMetadata()
              firstCatalogTrack.value(QStringLiteral("title")).toString());
     QCOMPARE(firstResolvedTrack.value(QStringLiteral("artist")).toString(),
              firstCatalogTrack.value(QStringLiteral("artist")).toString());
+    QCOMPARE(firstResolvedTrack.value(QStringLiteral("artworkUrl")).toString(),
+             firstCatalogTrack.value(QStringLiteral("artworkUrl")).toString());
     QVERIFY(firstResolvedTrack.value(QStringLiteral("url")).toString().startsWith(QStringLiteral("https://example.com/")));
     const QVariantList appendedTracks = appendedSpy.takeFirst().at(0).toList();
     QCOMPARE(appendedTracks.size(), 1);

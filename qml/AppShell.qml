@@ -108,6 +108,13 @@ Item {
         }
     }
 
+    Connections {
+        target: MusicSources
+        function onOnlineTracksChanged() {
+            AudioRuntime.reconcileOnlineTrackCache(MusicSources.onlineTracks)
+        }
+    }
+
     AuroraHome {
         id: home
 

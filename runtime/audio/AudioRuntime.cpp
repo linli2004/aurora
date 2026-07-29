@@ -65,6 +65,20 @@ QString queueMetadataKey(const QUrl &url)
     return urlDedupeKey(url);
 }
 
+QString cacheCatalogKeyFromTrack(const QVariantMap &track)
+{
+    const QString source = track.value(QStringLiteral("source"))
+        .toString()
+        .trimmed();
+    const QString songId = track.value(QStringLiteral("songId"))
+        .toString()
+        .trimmed();
+    if (source.isEmpty() || songId.isEmpty())
+        return {};
+
+    return source + QLatin1Char(':') + songId;
+}
+
 QStringList inputEntriesFromText(const QString &sourceText)
 {
     QStringList entries;
@@ -100,6 +114,106 @@ QStringList inputEntriesFromText(const QString &sourceText)
 }
 }
 
+
+// AUR-SOURCE-ARTWORK-RECOVERY-PACK-01:AUDIO-SESSION
+static QVariantMap identityToSessionMap(
+    const QUrl &url,
+    const LocalTrackIdentity &identity,
+    const QString &cacheCatalogKey)
+{
+    QVariantMap map;
+    map.insert(QStringLiteral("url"), url.toString());
+    if (!cacheCatalogKey.isEmpty())
+        map.insert(QStringLiteral("cacheCatalogKey"), cacheCatalogKey);
+    map.insert(QStringLiteral("trackId"), identity.trackId);
+    map.insert(QStringLiteral("sourceId"), identity.sourceId);
+    map.insert(QStringLiteral("filePath"), identity.filePath);
+    map.insert(QStringLiteral("canonicalTitle"), identity.canonicalTitle);
+    map.insert(QStringLiteral("title"), identity.title);
+    map.insert(QStringLiteral("artist"), identity.artist);
+    map.insert(QStringLiteral("album"), identity.album);
+    map.insert(QStringLiteral("trackNumber"), identity.trackNumber);
+    map.insert(
+        QStringLiteral("artworkSource"),
+        identity.artworkSource.toString());
+    map.insert(
+        QStringLiteral("identityColor"),
+        identity.identityColor.isValid()
+            ? identity.identityColor.name(QColor::HexArgb)
+            : QString());
+    map.insert(
+        QStringLiteral("hasEmbeddedArtwork"),
+        identity.hasEmbeddedArtwork);
+    map.insert(
+        QStringLiteral("metadataAvailable"),
+        identity.metadataAvailable);
+    map.insert(QStringLiteral("availability"), identity.availability);
+    map.insert(QStringLiteral("provenance"), identity.provenance);
+    return map;
+}
+
+static LocalTrackIdentity identityFromSessionMap(
+    const QUrl &url,
+    const QVariantMap &map)
+{
+    LocalTrackIdentity identity =
+        LocalTrackIdentityResolver::fallbackFor(url);
+
+    const auto assignText = [&map](
+        const QString &key,
+        QString *target) {
+        const QString value = map.value(key).toString();
+        if (!value.isEmpty())
+            *target = value;
+    };
+
+    assignText(QStringLiteral("trackId"), &identity.trackId);
+    assignText(QStringLiteral("sourceId"), &identity.sourceId);
+    assignText(QStringLiteral("filePath"), &identity.filePath);
+    assignText(
+        QStringLiteral("canonicalTitle"),
+        &identity.canonicalTitle);
+    assignText(QStringLiteral("title"), &identity.title);
+    assignText(QStringLiteral("artist"), &identity.artist);
+    assignText(QStringLiteral("album"), &identity.album);
+    assignText(
+        QStringLiteral("availability"),
+        &identity.availability);
+    assignText(QStringLiteral("provenance"), &identity.provenance);
+
+    identity.trackNumber =
+        map.value(
+            QStringLiteral("trackNumber"),
+            identity.trackNumber)
+            .toInt();
+
+    const QUrl artwork(
+        map.value(
+            QStringLiteral("artworkSource"))
+            .toString());
+    if (artwork.isValid() && !artwork.isEmpty())
+        identity.artworkSource = artwork;
+
+    const QColor color(
+        map.value(
+            QStringLiteral("identityColor"))
+            .toString());
+    if (color.isValid())
+        identity.identityColor = color;
+
+    identity.hasEmbeddedArtwork =
+        map.value(
+            QStringLiteral("hasEmbeddedArtwork"),
+            identity.hasEmbeddedArtwork)
+            .toBool();
+    identity.metadataAvailable =
+        map.value(
+            QStringLiteral("metadataAvailable"),
+            identity.metadataAvailable)
+            .toBool();
+
+    return identity;
+}
 AudioRuntime::AudioRuntime(QObject *parent)
     : QObject(parent)
 {
@@ -123,6 +237,36 @@ AudioRuntime::AudioRuntime(QObject *parent)
             this, &AudioRuntime::audioReactiveAvailabilityChanged);
     connect(&m_mediaCache, &MediaCacheService::cacheChanged,
             this, &AudioRuntime::mediaCacheChanged);
+    // AUR-SOURCE-ARTWORK-RECOVERY-PACK-01:CACHE-SWITCH
+    connect(
+        &m_mediaCache,
+        &MediaCacheService::mediaReady,
+        this,
+        [this](
+            const QUrl &originalSource,
+            const QUrl &cachedSource) {
+            const QUrl currentQueueSource = m_queue.currentUrl();
+            if (currentQueueSource.isEmpty()
+                || queueMetadataKey(currentQueueSource)
+                    != queueMetadataKey(originalSource)
+                || !cachedSource.isLocalFile()
+                || m_player.source() == cachedSource) {
+                return;
+            }
+
+            const bool resumePlayback = playing();
+            const qint64 resumePosition = qMax<qint64>(
+                0,
+                position());
+
+            m_pendingRestorePosition = resumePosition;
+            m_restorePositionAttempts = 0;
+            m_restorePositionTimer.stop();
+            m_player.setSource(cachedSource);
+
+            if (resumePlayback)
+                m_player.play();
+        });
 
     connect(&m_player, &QMediaPlayer::sourceChanged, this, [this] { emit sourceChanged(); });
     connect(&m_player, &QMediaPlayer::durationChanged, this, [this] {
@@ -395,6 +539,8 @@ void AudioRuntime::setQueue(const QVariantList &urls)
     }
 
     m_queueIdentityOverrides.clear();
+    m_queueCacheCatalogKeys.clear();
+    m_deferredPlaybackPending = false;
     m_queue.setUrls(filtered);
     emit queueChanged();
     loadCurrent(true);
@@ -404,7 +550,11 @@ void AudioRuntime::setQueue(const QVariantList &urls)
 void AudioRuntime::setQueueWithMetadata(const QVariantList &tracks)
 {
     QHash<QString, LocalTrackIdentity> identityOverrides;
-    const QList<QUrl> urls = urlsFromMetadataTracks(tracks, &identityOverrides);
+    QHash<QString, QString> cacheCatalogKeys;
+    const QList<QUrl> urls = urlsFromMetadataTracks(
+        tracks,
+        &identityOverrides,
+        &cacheCatalogKeys);
 
     if (urls.isEmpty()) {
         setErrorString(tr("No playable online source tracks were resolved."));
@@ -412,6 +562,8 @@ void AudioRuntime::setQueueWithMetadata(const QVariantList &tracks)
     }
 
     m_queueIdentityOverrides = identityOverrides;
+    m_queueCacheCatalogKeys = cacheCatalogKeys;
+    m_deferredPlaybackPending = false;
     m_queue.setUrls(urls);
     emit queueChanged();
     loadCurrent(true);
@@ -421,7 +573,11 @@ void AudioRuntime::setQueueWithMetadata(const QVariantList &tracks)
 void AudioRuntime::appendQueueWithMetadata(const QVariantList &tracks)
 {
     QHash<QString, LocalTrackIdentity> identityOverrides;
-    QList<QUrl> urls = urlsFromMetadataTracks(tracks, &identityOverrides);
+    QHash<QString, QString> cacheCatalogKeys;
+    QList<QUrl> urls = urlsFromMetadataTracks(
+        tracks,
+        &identityOverrides,
+        &cacheCatalogKeys);
     if (urls.isEmpty())
         return;
 
@@ -431,13 +587,16 @@ void AudioRuntime::appendQueueWithMetadata(const QVariantList &tracks)
 
     qsizetype writeIndex = 0;
     for (const QUrl &url : std::as_const(urls)) {
-        if (existing.contains(queueMetadataKey(url)))
+        const QString key = queueMetadataKey(url);
+        if (existing.contains(key))
             continue;
 
-        existing.insert(queueMetadataKey(url));
+        existing.insert(key);
         urls[writeIndex++] = url;
-        m_queueIdentityOverrides.insert(queueMetadataKey(url),
-                                        identityOverrides.value(queueMetadataKey(url)));
+        m_queueIdentityOverrides.insert(key, identityOverrides.value(key));
+        const QString cacheCatalogKey = cacheCatalogKeys.value(key);
+        if (!cacheCatalogKey.isEmpty())
+            m_queueCacheCatalogKeys.insert(key, cacheCatalogKey);
     }
     urls.resize(writeIndex);
     if (urls.isEmpty())
@@ -461,6 +620,8 @@ void AudioRuntime::appendFiles(const QVariantList &urls)
     }
 
     m_queueIdentityOverrides.clear();
+    m_queueCacheCatalogKeys.clear();
+    m_deferredPlaybackPending = false;
     const bool wasEmpty = m_queue.isEmpty();
     m_queue.appendUrls(filtered);
     emit queueChanged();
@@ -479,6 +640,8 @@ void AudioRuntime::setQueueFromText(const QString &sourceText)
     }
 
     m_queueIdentityOverrides.clear();
+    m_queueCacheCatalogKeys.clear();
+    m_deferredPlaybackPending = false;
     m_queue.setUrls(filtered);
     emit queueChanged();
     loadCurrent(true);
@@ -494,6 +657,8 @@ void AudioRuntime::appendSourcesFromText(const QString &sourceText)
     }
 
     m_queueIdentityOverrides.clear();
+    m_queueCacheCatalogKeys.clear();
+    m_deferredPlaybackPending = false;
     const bool wasEmpty = m_queue.isEmpty();
     m_queue.appendUrls(filtered);
     emit queueChanged();
@@ -512,6 +677,8 @@ void AudioRuntime::clearQueue()
     m_featureAnalyzer.reset();
     m_player.stop();
     m_queueIdentityOverrides.clear();
+    m_queueCacheCatalogKeys.clear();
+    m_deferredPlaybackPending = false;
     m_queue.clear();
     m_player.setSource(QUrl());
     applyTrackIdentity({});
@@ -578,6 +745,121 @@ void AudioRuntime::seekRelative(qint64 deltaMilliseconds)
 void AudioRuntime::clearMediaCache()
 {
     m_mediaCache.clear();
+}
+
+int AudioRuntime::wrappedQueueIndex(int direction) const
+{
+    const int count = m_queue.count();
+    if (count <= 0)
+        return -1;
+
+    const int current = m_queue.currentIndex();
+    if (current < 0 || current >= count)
+        return direction < 0 ? count - 1 : 0;
+
+    const int step = direction < 0 ? -1 : 1;
+    return (current + step + count) % count;
+}
+
+QVariantMap AudioRuntime::queueTrackMetadata(int index) const
+{
+    const QList<QUrl> queueUrls = m_queue.urls();
+    if (index < 0 || index >= queueUrls.size())
+        return {};
+
+    const QUrl url = queueUrls.at(index);
+    LocalTrackIdentity identity = identityOverrideFor(url);
+    if (identity.trackId.isEmpty())
+        identity = LocalTrackIdentityResolver::fallbackFor(url);
+
+    QVariantMap track;
+    track.insert(QStringLiteral("url"), url.toString());
+    track.insert(QStringLiteral("trackId"), identity.trackId);
+    track.insert(QStringLiteral("sourceId"), identity.sourceId);
+    track.insert(QStringLiteral("title"), identity.title);
+    track.insert(QStringLiteral("artist"), identity.artist);
+    track.insert(QStringLiteral("album"), identity.album);
+    track.insert(
+        QStringLiteral("identityColor"),
+        identity.identityColor.isValid()
+            ? identity.identityColor.name(QColor::HexArgb)
+            : QString());
+    track.insert(
+        QStringLiteral("artworkUrl"),
+        identity.artworkSource.toString());
+
+    const QString catalogKey = cacheCatalogKeyFor(url);
+    if (!catalogKey.isEmpty()) {
+        track.insert(QStringLiteral("cacheCatalogKey"), catalogKey);
+        const qsizetype separator = catalogKey.indexOf(QLatin1Char(':'));
+        if (separator > 0 && separator < catalogKey.size() - 1) {
+            track.insert(QStringLiteral("source"), catalogKey.left(separator));
+            track.insert(QStringLiteral("songId"), catalogKey.mid(separator + 1));
+        }
+    }
+
+    return track;
+}
+
+void AudioRuntime::warmQueueIndex(int index)
+{
+    const QList<QUrl> queueUrls = m_queue.urls();
+    if (index < 0 || index >= queueUrls.size())
+        return;
+
+    const QUrl url = queueUrls.at(index);
+    m_mediaCache.warm(url, cacheCatalogKeyFor(url));
+}
+
+void AudioRuntime::beginDeferredQueueStep(int direction)
+{
+    if (m_queue.count() < 2)
+        return;
+
+    const bool moved = direction < 0
+        ? m_queue.movePrevious()
+        : m_queue.moveNext();
+    if (!moved)
+        return;
+
+    m_deferredPlaybackPending = true;
+    m_pendingRestorePosition = -1;
+    m_restorePositionAttempts = 0;
+    m_restorePositionTimer.stop();
+    setErrorString({});
+
+    const QUrl url = m_queue.currentUrl();
+    const LocalTrackIdentity overrideIdentity = identityOverrideFor(url);
+    applyTrackIdentity(overrideIdentity.trackId.isEmpty()
+                           ? LocalTrackIdentityResolver::fallbackFor(url)
+                           : overrideIdentity);
+
+    emit queueChanged();
+    emit sourceChanged();
+    emit semanticStateChanged();
+}
+
+void AudioRuntime::commitDeferredPlayback(bool autoplay)
+{
+    if (!m_deferredPlaybackPending)
+        return;
+
+    m_deferredPlaybackPending = false;
+    loadCurrent(autoplay);
+    persistSession();
+}
+
+void AudioRuntime::reconcileOnlineTrackCache(
+    const QVariantList &tracks)
+{
+    QSet<QString> activeCatalogKeys;
+    for (const QVariant &trackValue : tracks) {
+        const QString key = cacheCatalogKeyFromTrack(trackValue.toMap());
+        if (!key.isEmpty())
+            activeCatalogKeys.insert(key);
+    }
+
+    m_mediaCache.reconcileCatalogKeys(activeCatalogKeys);
 }
 
 void AudioRuntime::setPosition(qint64 position)
@@ -682,7 +964,8 @@ QList<QUrl> AudioRuntime::urlsFromSourceText(const QString &sourceText) const
 
 QList<QUrl> AudioRuntime::urlsFromMetadataTracks(
     const QVariantList &tracks,
-    QHash<QString, LocalTrackIdentity> *identityOverrides) const
+    QHash<QString, LocalTrackIdentity> *identityOverrides,
+    QHash<QString, QString> *cacheCatalogKeys) const
 {
     QList<QUrl> urls;
     urls.reserve(tracks.size());
@@ -726,6 +1009,10 @@ QList<QUrl> AudioRuntime::urlsFromMetadataTracks(
         identity.provenance = QStringLiteral("Online source catalog · Resolver metadata");
         if (identityOverrides)
             identityOverrides->insert(key, identity);
+
+        const QString catalogKey = cacheCatalogKeyFromTrack(track);
+        if (cacheCatalogKeys && !catalogKey.isEmpty())
+            cacheCatalogKeys->insert(key, catalogKey);
     }
 
     return urls;
@@ -737,6 +1024,7 @@ void AudioRuntime::loadCurrent(bool autoplay, qint64 initialPosition)
     if (url.isEmpty())
         return;
 
+    m_deferredPlaybackPending = false;
     m_sessionPersistTimer.stop();
     m_restorePositionTimer.stop();
     m_restorePositionAttempts = 0;
@@ -750,7 +1038,27 @@ void AudioRuntime::loadCurrent(bool autoplay, qint64 initialPosition)
                            : overrideIdentity);
     const QUrl playbackSource = m_mediaCache.playbackSource(url);
     m_player.setSource(playbackSource);
-    m_mediaCache.warm(url);
+    m_mediaCache.warm(url, cacheCatalogKeyFor(url));
+
+    // AUR-SOURCE-ARTWORK-RECOVERY-PACK-01:PREFETCH
+    const QList<QUrl> queueUrls = m_queue.urls();
+    if (queueUrls.size() > 1) {
+        const int nextIndex = wrappedQueueIndex(1);
+        if (nextIndex >= 0 && nextIndex < queueUrls.size())
+            m_mediaCache.warm(
+                queueUrls.at(nextIndex),
+                cacheCatalogKeyFor(queueUrls.at(nextIndex)));
+
+        const int previousIndex = wrappedQueueIndex(-1);
+        if (previousIndex >= 0
+            && previousIndex < queueUrls.size()
+            && previousIndex != nextIndex) {
+            m_mediaCache.warm(
+                queueUrls.at(previousIndex),
+                cacheCatalogKeyFor(queueUrls.at(previousIndex)));
+        }
+    }
+
     emit semanticStateChanged();
 
     if (autoplay)
@@ -792,14 +1100,52 @@ void AudioRuntime::applyPendingSessionPosition()
 void AudioRuntime::restoreSession()
 {
     m_queueIdentityOverrides.clear();
+    m_queueCacheCatalogKeys.clear();
     LocalLibraryRepository repository;
     if (!repository.open(libraryDatabasePath()))
         return;
 
-    const QVariantMap session = repository.setting(QStringLiteral("playback.session.v1"));
-    const QList<QUrl> urls = validAudioSources(urlsFromSetting(session.value(QStringLiteral("urls"))));
+    const QVariantMap session =
+        repository.setting(QStringLiteral("playback.session.v1"));
+    const QList<QUrl> urls = validAudioSources(
+        urlsFromSetting(
+            session.value(QStringLiteral("urls"))));
     if (urls.isEmpty())
         return;
+
+    // AUR-SOURCE-ARTWORK-RECOVERY-PACK-01:RESTORE-METADATA
+    QSet<QString> restoredKeys;
+    for (const QUrl &url : urls)
+        restoredKeys.insert(queueMetadataKey(url));
+
+    const QVariantList storedMetadata =
+        session.value(
+            QStringLiteral("trackMetadata"))
+            .toList();
+    for (const QVariant &entry : storedMetadata) {
+        const QVariantMap map = entry.toMap();
+        const QUrl url(
+            map.value(QStringLiteral("url"))
+                .toString());
+        const QString key = queueMetadataKey(url);
+        if (!url.isValid()
+            || url.isEmpty()
+            || !restoredKeys.contains(key)) {
+            continue;
+        }
+
+        const LocalTrackIdentity identity =
+            identityFromSessionMap(url, map);
+        if (!identity.trackId.isEmpty())
+            m_queueIdentityOverrides.insert(key, identity);
+
+        const QString cacheCatalogKey =
+            map.value(QStringLiteral("cacheCatalogKey"))
+                .toString()
+                .trimmed();
+        if (!cacheCatalogKey.isEmpty())
+            m_queueCacheCatalogKeys.insert(key, cacheCatalogKey);
+    }
 
     m_audioOutput.setVolume(qBound<qreal>(
         0.0,
@@ -818,6 +1164,13 @@ LocalTrackIdentity AudioRuntime::identityOverrideFor(const QUrl &url) const
     return iterator == m_queueIdentityOverrides.cend() ? LocalTrackIdentity{} : iterator.value();
 }
 
+QString AudioRuntime::cacheCatalogKeyFor(const QUrl &url) const
+{
+    const auto iterator =
+        m_queueCacheCatalogKeys.constFind(queueMetadataKey(url));
+    return iterator == m_queueCacheCatalogKeys.cend() ? QString() : iterator.value();
+}
+
 void AudioRuntime::persistSession()
 {
     m_sessionPersistTimer.stop();
@@ -828,12 +1181,41 @@ void AudioRuntime::persistSession()
         return;
 
     QVariantList urls;
+    QVariantList trackMetadata;
     urls.reserve(m_queue.urls().size());
-    for (const QUrl &url : m_queue.urls())
+    trackMetadata.reserve(m_queue.urls().size());
+
+    // AUR-SOURCE-ARTWORK-RECOVERY-PACK-01:PERSIST-METADATA
+    for (const QUrl &url : m_queue.urls()) {
         urls.append(url.toString());
+
+        LocalTrackIdentity identity =
+            identityOverrideFor(url);
+        if (identity.trackId.isEmpty()
+            && queueMetadataKey(url)
+                == queueMetadataKey(m_queue.currentUrl())) {
+            identity = m_trackIdentity;
+        }
+        const QString cacheCatalogKey = cacheCatalogKeyFor(url);
+
+        const bool meaningful =
+            identity.metadataAvailable
+            || !identity.artworkSource.isEmpty()
+            || !identity.title.isEmpty()
+            || !identity.artist.isEmpty()
+            || !identity.album.isEmpty();
+
+        if (meaningful || !cacheCatalogKey.isEmpty()) {
+            trackMetadata.append(
+                identityToSessionMap(url, identity, cacheCatalogKey));
+        }
+    }
 
     QVariantMap session;
     session.insert(QStringLiteral("urls"), urls);
+    session.insert(
+        QStringLiteral("trackMetadata"),
+        trackMetadata);
     session.insert(QStringLiteral("currentIndex"), m_queue.currentIndex());
     session.insert(QStringLiteral("volume"), m_audioOutput.volume());
     session.insert(QStringLiteral("positionMs"), position());

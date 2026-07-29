@@ -52,6 +52,9 @@ int main(int argc, char *argv[])
     qmlRegisterSingletonInstance(
         "Aurora.Runtime", 1, 0, "ArtworkIllustration",
         &artworkIllustrationService);
+    MusicSourceRegistry musicSourceRegistry;
+    qmlRegisterSingletonInstance(
+        "Aurora.Runtime", 1, 0, "MusicSources", &musicSourceRegistry);
 
     qmlRegisterSingletonType<LocalLibraryService>(
         "Aurora.Runtime",
@@ -69,15 +72,6 @@ int main(int argc, char *argv[])
         "Moments",
         [](QQmlEngine *, QJSEngine *) -> QObject * {
             return new MomentService;
-        });
-
-    qmlRegisterSingletonType<MusicSourceRegistry>(
-        "Aurora.Runtime",
-        1,
-        0,
-        "MusicSources",
-        [](QQmlEngine *, QJSEngine *) -> QObject * {
-            return new MusicSourceRegistry;
         });
 
     QQmlApplicationEngine engine;
