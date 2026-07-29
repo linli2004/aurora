@@ -12,6 +12,7 @@
 #include <QUrl>
 #include <QtQml/qqml.h>
 
+#include <algorithm>
 #include <cstdlib>
 
 #include "runtime/AuroraStateMapper.h"
@@ -24,7 +25,7 @@
 #include "runtime/sources/MusicSourceRegistry.h"
 
 namespace {
-bool ensureDemoAudioFile(const QString &path)
+bool ensureDemoAudioFile(const QString &path, int durationSeconds = 1)
 {
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
@@ -33,10 +34,11 @@ bool ensureDemoAudioFile(const QString &path)
     constexpr quint16 channelCount = 1;
     constexpr quint32 sampleRate = 8000;
     constexpr quint16 bitsPerSample = 16;
-    constexpr quint32 sampleCount = sampleRate;
+    const quint32 sampleCount =
+        sampleRate * static_cast<quint32>(std::max(1, durationSeconds));
     constexpr quint16 blockAlign = channelCount * bitsPerSample / 8;
     constexpr quint32 byteRate = sampleRate * blockAlign;
-    constexpr quint32 dataSize = sampleCount * blockAlign;
+    const quint32 dataSize = sampleCount * blockAlign;
 
     QByteArray header;
     QDataStream stream(&header, QIODevice::WriteOnly);
@@ -125,6 +127,9 @@ int main(int argc, char *argv[])
     qmlRegisterSingletonInstance(
         "Aurora.Runtime", 1, 0, "ArtworkIllustration",
         &artworkIllustrationService);
+    MusicSourceRegistry musicSourceRegistry;
+    qmlRegisterSingletonInstance(
+        "Aurora.Runtime", 1, 0, "MusicSources", &musicSourceRegistry);
 
     qmlRegisterSingletonType<LocalLibraryService>(
         "Aurora.Runtime",
@@ -142,15 +147,6 @@ int main(int argc, char *argv[])
         "Moments",
         [](QQmlEngine *, QJSEngine *) -> QObject * {
             return new MomentService;
-        });
-
-    qmlRegisterSingletonType<MusicSourceRegistry>(
-        "Aurora.Runtime",
-        1,
-        0,
-        "MusicSources",
-        [](QQmlEngine *, QJSEngine *) -> QObject * {
-            return new MusicSourceRegistry;
         });
 
     QQmlApplicationEngine engine;
@@ -180,6 +176,51 @@ int main(int argc, char *argv[])
 
             if (QQuickItem *shell = findAppShell(window))
                 shell->setProperty("currentPage", 1);
+        }
+
+        if (mode == QStringLiteral("music-network-transition")
+                || mode == QStringLiteral("music-network-soft-reveal")
+                || mode == QStringLiteral("music-network-reveal")) {
+            const QString firstPath =
+                QDir::temp().filePath(QStringLiteral("aurora-network-first.wav"));
+            const QString secondPath =
+                QDir::temp().filePath(QStringLiteral("aurora-network-second.wav"));
+            if (!ensureDemoAudioFile(firstPath, 16)
+                    || !ensureDemoAudioFile(secondPath, 16)) {
+                QCoreApplication::exit(EXIT_FAILURE);
+            }
+
+            QVariantMap firstTrack;
+            firstTrack.insert(QStringLiteral("url"), QUrl::fromLocalFile(firstPath));
+            firstTrack.insert(QStringLiteral("title"), QStringLiteral("aurora-network-first"));
+            firstTrack.insert(QStringLiteral("artist"), QStringLiteral("Network Demo"));
+            firstTrack.insert(QStringLiteral("album"), QStringLiteral("Transition"));
+            firstTrack.insert(
+                QStringLiteral("artworkUrl"),
+                QStringLiteral("qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"));
+
+            QVariantMap secondTrack;
+            secondTrack.insert(QStringLiteral("url"), QUrl::fromLocalFile(secondPath));
+            secondTrack.insert(QStringLiteral("title"), QStringLiteral("aurora-network-second"));
+            secondTrack.insert(QStringLiteral("artist"), QStringLiteral("Network Demo"));
+            secondTrack.insert(QStringLiteral("album"), QStringLiteral("Transition"));
+            secondTrack.insert(
+                QStringLiteral("artworkUrl"),
+                QStringLiteral("qrc:/qt/qml/Aurora/App/assets/demo-cover-b.png"));
+
+            audioRuntime.setQueueWithMetadata({firstTrack, secondTrack});
+
+            if (QQuickItem *shell = findAppShell(window))
+                shell->setProperty("currentPage", 1);
+            if (QQuickItem *musicSpace = findItemWithProperty(
+                    window->contentItem(), "networkTransitionEnabled")) {
+                const bool invoked = QMetaObject::invokeMethod(
+                    musicSpace,
+                    "beginTrackTransition",
+                    Q_ARG(QVariant, QVariant(1)));
+                if (!invoked)
+                    QCoreApplication::exit(EXIT_FAILURE);
+            }
         }
 
         if (mode == QStringLiteral("music-source-panel")) {
@@ -235,7 +276,12 @@ int main(int argc, char *argv[])
                 shell->setProperty("currentPage", 0);
         }
 
-        const int settleDelay = mode == QStringLiteral("music-presence") ? 4700 : 900;
+        const int settleDelay =
+            mode == QStringLiteral("music-presence") ? 4700
+            : mode == QStringLiteral("music-network-transition") ? 1900
+            : mode == QStringLiteral("music-network-soft-reveal") ? 7200
+            : mode == QStringLiteral("music-network-reveal") ? 16600
+            : 900;
         QTimer::singleShot(settleDelay, &app, [&app, window, outputPath]() {
             const QImage image = window->grabWindow();
             if (image.isNull() || !image.save(outputPath))
