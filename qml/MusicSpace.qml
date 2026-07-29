@@ -21,6 +21,13 @@ Item {
     property bool appendResolvedSource: false
     property bool transitionCrystalSettling: false
     property bool presentationMode: false
+    property bool networkTransitionEnabled: true
+    property bool transitionLayoutControlsVisible: false
+    property var activeNetworkTransitionAction: null
+    property var pendingNetworkTransitionAction: null
+    property bool transitionPlaybackRequested: false
+    property bool resolvingNetworkTransitionTarget: false
+    property string transitionTargetUrl: ""
     property real presencePhase: 0.0
     property int artworkRefreshAttempt: 0
 
@@ -59,6 +66,13 @@ Item {
         AudioRuntime.hasTrack && AudioRuntime.identityColorAvailable
         ? AudioRuntime.identityColor
         : AuroraTokens.coolAccent
+    property string transitionIncomingTitle: displayTitle
+    property string transitionIncomingArtist: displayArtist
+    property url transitionIncomingArtworkSource:
+        AudioRuntime.hasTrack
+        ? AudioRuntime.artworkSource
+        : "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
+    property color transitionIncomingColor: displayIdentityColor
     readonly property real progressRatio:
         AudioRuntime.duration > 0 ? Math.min(1, AudioRuntime.position / AudioRuntime.duration) : 0
     readonly property bool libraryBrowserAvailable: LocalLibrary.sourceCount > 0 || LocalLibrary.searchText.length > 0
@@ -71,6 +85,10 @@ Item {
         || root.libraryMenuExpanded
         || root.tracksPanelExpanded
         || root.sourcePanelExpanded
+    readonly property bool layoutControlsVisible:
+        networkTransition.running
+        ? root.transitionLayoutControlsVisible
+        : root.controlsVisible
     readonly property real controlOpacity: root.controlsVisible ? 1.0 : 0.0
     readonly property bool reducedMotion:
         root.accessibilityMode === AuroraTypes.AccessibilityReducedMotion
@@ -114,6 +132,80 @@ Item {
     readonly property color mangaMutedText: AuroraTokens.mangaMuted
 
     signal closeRequested()
+
+    function clamp01(value) {
+        return Math.max(0.0, Math.min(1.0, value))
+    }
+
+    function transitionLayerAmount(start, end) {
+        if (!networkTransition.running)
+            return 1.0
+        const amount = root.clamp01((networkTransition.revealProgress - start)
+                                    / Math.max(0.001, end - start))
+        if (networkTransition.transitionState === "PlaybackRevealing")
+            return 0.20 + amount * 0.80
+        return amount
+    }
+
+    function transitionTrackKey(track, fallbackIndex) {
+        if (!track)
+            return "track:" + fallbackIndex
+        if (track.sourceId && track.sourceId.length > 0)
+            return track.sourceId
+        if (track.cacheCatalogKey && track.cacheCatalogKey.length > 0)
+            return track.cacheCatalogKey
+        if (track.source && track.songId)
+            return track.source + ":" + track.songId
+        if (track.url && track.url.length > 0)
+            return track.url
+        if (track.trackId && track.trackId.length > 0)
+            return track.trackId
+        return "track:" + fallbackIndex + ":" + (track.title || "")
+    }
+
+    function currentNetworkTrack() {
+        if (AudioRuntime.hasTrack && AudioRuntime.currentIndex >= 0)
+            return AudioRuntime.queueTrackMetadata(AudioRuntime.currentIndex)
+
+        return {
+            title: root.displayTitle,
+            artist: root.displayArtist,
+            album: root.displayAlbum,
+            url: AudioRuntime.source.toString(),
+            trackId: AudioRuntime.trackId,
+            sourceId: AudioRuntime.sourceId
+        }
+    }
+
+    function queueNetworkTracks(targetTrack) {
+        const tracks = []
+        const seen = {}
+
+        function append(track, index) {
+            if (!track)
+                return
+            const key = root.transitionTrackKey(track, index)
+            if (seen[key])
+                return
+            seen[key] = true
+            tracks.push(track)
+        }
+
+        const count = AudioRuntime.queueCount
+        if (count > 0) {
+            const limit = Math.min(22, count)
+            const current = Math.max(0, AudioRuntime.currentIndex)
+            const start = current - Math.floor(limit / 2)
+            for (let offset = 0; offset < limit; ++offset) {
+                const index = (start + offset + count) % count
+                append(AudioRuntime.queueTrackMetadata(index), index)
+            }
+        }
+
+        append(root.currentNetworkTrack(), -1)
+        append(targetTrack, -2)
+        return tracks
+    }
 
     function identityAnchorRect() {
         const anchorX = illustrationSpace.width * 0.34
@@ -215,25 +307,602 @@ Item {
     }
 
     function playOnlineTrack(index) {
-        MusicSources.resolveOnlineTracksFrom(index)
+        requestOnlineTrackTransition(index)
         sourceInput.focus = false
     }
 
     function beginTrackTransition(direction) {
-        if (liquidTrackTransition.running || AudioRuntime.queueCount < 2)
+        if (!root.networkTransitionEnabled) {
+            if (direction > 0)
+                AudioRuntime.next()
+            else
+                AudioRuntime.previous()
+            return
+        }
+
+        if (AudioRuntime.queueCount < 2)
             return
 
-        liquidTrackTransition.outgoingTitle = root.displayTitle
-        liquidTrackTransition.outgoingArtist = root.displayArtist
-        liquidTrackTransition.outgoingArtworkSource = AudioRuntime.hasTrack
-                ? AudioRuntime.artworkSource
+        const targetIndex = AudioRuntime.wrappedQueueIndex(direction)
+        if (targetIndex < 0)
+            return
+
+        const targetTrack = AudioRuntime.queueTrackMetadata(targetIndex)
+        if (targetTrack.url && targetTrack.url.length > 0)
+            AudioRuntime.warmQueueIndex(targetIndex)
+        Lyrics.warmForTracks([targetTrack])
+
+        root.requestNetworkTransition({
+            kind: "direction",
+            direction: direction < 0 ? -1 : 1,
+            targetIndex: targetIndex,
+            targetTrack: targetTrack
+        })
+    }
+
+    function requestLocalTrackTransition(index, targetTrack) {
+        if (!root.networkTransitionEnabled || !AudioRuntime.hasTrack) {
+            AudioRuntime.setQueue(LocalLibrary.visiblePlayableUrlsStartingAt(index))
+            root.tracksPanelExpanded = false
+            return
+        }
+
+        root.requestNetworkTransition({
+            kind: "localQueue",
+            row: index,
+            targetTrack
+        })
+        root.tracksPanelExpanded = false
+    }
+
+    function requestOnlineTrackTransition(index) {
+        const tracks = MusicSources.onlineTracks
+        const targetTrack = index >= 0 && index < tracks.length ? tracks[index] : ({})
+
+        if (!root.networkTransitionEnabled || !AudioRuntime.hasTrack) {
+            MusicSources.resolveOnlineTracksFrom(index)
+            return
+        }
+
+        root.requestNetworkTransition({
+            kind: "onlineCatalog",
+            row: index,
+            targetTrack
+        })
+    }
+
+    function requestNetworkTransition(action) {
+        if (!action || !action.targetTrack) {
+            root.executeNetworkTransitionAction(action)
+            return
+        }
+
+        if (networkTransition.running) {
+            root.pendingNetworkTransitionAction = action
+            return
+        }
+
+        const currentTrack = root.currentNetworkTrack()
+        const targetTrack = action.targetTrack
+        root.activeNetworkTransitionAction = action
+        root.pendingNetworkTransitionAction = null
+        root.transitionPlaybackRequested = false
+        root.resolvingNetworkTransitionTarget = false
+        root.transitionTargetUrl = targetTrack.url || ""
+        root.transitionLayoutControlsVisible = root.controlsVisible
+
+        root.transitionIncomingTitle =
+                targetTrack.title && targetTrack.title.length > 0
+                ? targetTrack.title
+                : root.displayTitle
+        root.transitionIncomingArtist =
+                targetTrack.artist && targetTrack.artist.length > 0
+                ? targetTrack.artist
+                : root.displayArtist
+        root.transitionIncomingArtworkSource =
+                targetTrack.artworkUrl && targetTrack.artworkUrl.length > 0
+                ? targetTrack.artworkUrl
                 : "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
-        liquidTrackTransition.outgoingColor = root.displayIdentityColor
-        liquidTrackTransition.targetRect = root.identityAnchorRect()
+        root.transitionIncomingColor =
+                targetTrack.identityColor && targetTrack.identityColor.length > 0
+                ? targetTrack.identityColor
+                : root.displayIdentityColor
+
         root.transitionLanding = false
         root.transitionCrystalSettling = true
-        liquidTrackTransition.start(direction)
+        networkTransition.startTransition(
+                    currentTrack,
+                    targetTrack,
+                    root.queueNetworkTracks(targetTrack))
     }
+
+    function executeNetworkTransitionAction(action) {
+        if (!action)
+            return
+
+        root.transitionPlaybackRequested = true
+        root.activeNetworkTransitionAction = action
+        root.transitionTargetUrl = action.targetTrack && action.targetTrack.url
+                ? action.targetTrack.url
+                : ""
+
+        if (action.kind === "direction") {
+            AudioRuntime.beginDeferredQueueStep(action.direction)
+            root.transitionTargetUrl = AudioRuntime.source.toString()
+            AudioRuntime.commitDeferredPlayback(true)
+            playbackStartPollTimer.restart()
+            return
+        }
+
+        if (action.kind === "localQueue") {
+            AudioRuntime.setQueue(LocalLibrary.visiblePlayableUrlsStartingAt(action.row))
+            playbackStartPollTimer.restart()
+            return
+        }
+
+        if (action.kind === "onlineCatalog") {
+            root.resolvingNetworkTransitionTarget = true
+            MusicSources.resolveOnlineTracksFrom(action.row)
+        }
+    }
+
+    function networkTargetPlaybackStarted() {
+        if (!networkTransition.running
+                || networkTransition.transitionState !== "WaitingForAudio"
+                || !root.transitionPlaybackRequested
+                || root.resolvingNetworkTransitionTarget) {
+            return false
+        }
+
+        if (root.transitionTargetUrl.length > 0
+                && AudioRuntime.source.toString() !== root.transitionTargetUrl) {
+            return false
+        }
+
+        return AudioRuntime.playing
+    }
+
+    function checkNetworkPlaybackStarted() {
+        if (root.networkTargetPlaybackStarted()) {
+            playbackStartPollTimer.stop()
+            networkTransition.confirmPlaybackStarted()
+        }
+    }
+
+    function resetNetworkTransitionRuntime() {
+        playbackStartPollTimer.stop()
+        root.activeNetworkTransitionAction = null
+        root.transitionPlaybackRequested = false
+        root.resolvingNetworkTransitionTarget = false
+        root.transitionTargetUrl = ""
+    }
+
+
+    // AUR-CONTROLS-REFERENCE-PACK-04:BEGIN
+    component MangekyoEyeButton: Item {
+        id: eyeButton
+
+        property int direction: -1
+        property bool reducedMotion: false
+        property bool armed: true
+        property real blinkProgress: 0.0
+        property real breathingPhase: 0.0
+        property real hoverAmount: hoverHandler.hovered ? 1.0 : 0.0
+        property real pressAmount: tapHandler.pressed ? 1.0 : 0.0
+
+        signal activated()
+
+        width: 112
+        height: 72
+        opacity: armed ? 1.0 : 0.44
+        scale: 1.0 + hoverAmount * 0.035 - pressAmount * 0.025
+
+        function blinkAndActivate() {
+            if (!armed || clickBlink.running)
+                return
+            clickBlink.restart()
+        }
+
+        Timer {
+            id: idleBlinkTimer
+
+            interval: 2600
+            repeat: true
+            running: eyeButton.visible
+
+            onTriggered: {
+                if (!idleBlink.running && !clickBlink.running)
+                    idleBlink.restart()
+                interval = 2300 + Math.floor(Math.random() * 2100)
+            }
+        }
+
+        SequentialAnimation {
+            id: idleBlink
+
+            NumberAnimation {
+                target: eyeButton
+                property: "blinkProgress"
+                to: 1.0
+                duration: 105
+                easing.type: Easing.InCubic
+            }
+
+            PauseAnimation { duration: 44 }
+
+            NumberAnimation {
+                target: eyeButton
+                property: "blinkProgress"
+                to: 0.0
+                duration: 185
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        SequentialAnimation {
+            id: clickBlink
+
+            NumberAnimation {
+                target: eyeButton
+                property: "blinkProgress"
+                to: 1.0
+                duration: 82
+                easing.type: Easing.InCubic
+            }
+
+            PauseAnimation { duration: 36 }
+
+            ScriptAction {
+                script: eyeButton.activated()
+            }
+
+            NumberAnimation {
+                target: eyeButton
+                property: "blinkProgress"
+                to: 0.0
+                duration: 190
+                easing.type: Easing.OutBack
+            }
+        }
+
+        NumberAnimation on breathingPhase {
+            from: 0.0
+            to: Math.PI * 2.0
+            duration: 3600
+            loops: Animation.Infinite
+            running: eyeButton.visible && !eyeButton.reducedMotion
+        }
+
+        Behavior on scale {
+            NumberAnimation {
+                duration: 130
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        HoverHandler {
+            id: hoverHandler
+        }
+
+        TapHandler {
+            id: tapHandler
+
+            enabled: eyeButton.armed
+            onTapped: eyeButton.blinkAndActivate()
+        }
+
+        Item {
+            id: eyeViewport
+
+            anchors.fill: parent
+            clip: false
+
+            Image {
+                id: eyeImage
+
+                anchors.centerIn: parent
+                width: parent.width
+                height: parent.height * 0.88
+                source:
+                    "qrc:/qt/qml/Aurora/App/assets/controls/mangekyo-eye-reference.png"
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                mipmap: true
+                asynchronous: false
+                cache: true
+                mirror: eyeButton.direction > 0
+                opacity: 1.0 - Math.max(
+                    0.0,
+                    (eyeButton.blinkProgress - 0.84) / 0.16)
+                scale:
+                    1.0
+                    + Math.sin(eyeButton.breathingPhase) * 0.008
+                    + eyeButton.hoverAmount * 0.018
+
+                transform: Scale {
+                    origin.x: eyeImage.width * 0.5
+                    origin.y: eyeImage.height * 0.5
+                    xScale: 1.0
+                    yScale: Math.max(
+                        0.035,
+                        1.0 - eyeButton.blinkProgress * 0.965)
+                }
+
+                Behavior on scale {
+                    NumberAnimation {
+                        duration: 130
+                        easing.type: Easing.OutCubic
+                    }
+                }
+            }
+
+            Canvas {
+                id: closedLidCanvas
+
+                anchors.fill: parent
+                opacity: Math.max(
+                    0.0,
+                    (eyeButton.blinkProgress - 0.68) / 0.32)
+                antialiasing: true
+                renderTarget: Canvas.Image
+
+                onOpacityChanged: requestPaint()
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+
+                onPaint: {
+                    const ctx = getContext("2d")
+                    const w = width
+                    const h = height
+                    ctx.clearRect(0, 0, w, h)
+
+                    const cy = h * 0.48
+                    const left = w * 0.09
+                    const right = w * 0.91
+
+                    ctx.beginPath()
+                    ctx.moveTo(left, cy)
+                    ctx.bezierCurveTo(
+                        w * 0.30,
+                        cy + h * 0.08,
+                        w * 0.70,
+                        cy + h * 0.08,
+                        right,
+                        cy)
+                    ctx.lineWidth = 3.4
+                    ctx.lineCap = "round"
+                    ctx.strokeStyle = "rgba(30,20,22,0.94)"
+                    ctx.stroke()
+
+                    ctx.beginPath()
+                    ctx.moveTo(left + w * 0.04, cy - h * 0.02)
+                    ctx.bezierCurveTo(
+                        w * 0.32,
+                        cy - h * 0.07,
+                        w * 0.68,
+                        cy - h * 0.07,
+                        right - w * 0.04,
+                        cy - h * 0.02)
+                    ctx.lineWidth = 1.2
+                    ctx.strokeStyle = "rgba(108,58,56,0.38)"
+                    ctx.stroke()
+                }
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: -4
+                text: eyeButton.direction < 0 ? "‹" : "›"
+                color: Qt.rgba(26 / 255.0, 20 / 255.0, 23 / 255.0, 0.48)
+                font.pixelSize: 18
+                font.weight: Font.Medium
+            }
+        }
+    }
+
+    component LamborghiniPlayToggle: Item {
+        id: carButton
+
+        property bool playing: false
+        property bool hasTrack: false
+        property bool reducedMotion: false
+        property real drivePhase: 0.0
+        property real wheelPhase: 0.0
+        property real suspensionPhase: 0.0
+        property real hoverAmount: carHover.hovered ? 1.0 : 0.0
+        property real pressAmount: carTap.pressed ? 1.0 : 0.0
+
+        signal activated()
+
+        width: 204
+        height: 92
+        opacity: hasTrack ? 1.0 : 0.66
+        scale: 1.0 + hoverAmount * 0.03 - pressAmount * 0.02
+
+        NumberAnimation on drivePhase {
+            from: 0.0
+            to: 1.0
+            duration: 720
+            loops: Animation.Infinite
+            running: carButton.playing && !carButton.reducedMotion
+        }
+
+        NumberAnimation on wheelPhase {
+            from: 0.0
+            to: 360.0
+            duration: 560
+            loops: Animation.Infinite
+            running: carButton.playing && !carButton.reducedMotion
+        }
+
+        NumberAnimation on suspensionPhase {
+            from: -1.0
+            to: 1.0
+            duration: 980
+            loops: Animation.Infinite
+            easing.type: Easing.InOutSine
+            running: carButton.playing && !carButton.reducedMotion
+        }
+
+        Behavior on scale {
+            NumberAnimation {
+                duration: 130
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        HoverHandler {
+            id: carHover
+        }
+
+        TapHandler {
+            id: carTap
+            onTapped: carButton.activated()
+        }
+
+        Canvas {
+            id: motionCanvas
+
+            anchors.fill: parent
+            antialiasing: true
+            renderTarget: Canvas.Image
+
+            onPaint: {
+                const ctx = getContext("2d")
+                const w = width
+                const h = height
+                ctx.clearRect(0, 0, w, h)
+
+                if (!carButton.playing)
+                    return
+
+                for (let index = 0; index < 5; ++index) {
+                    const phase =
+                        (carButton.drivePhase + index * 0.19) % 1.0
+                    const y = h * (0.58 + index * 0.055)
+                    const startX = w * (0.20 + phase * 0.26)
+                    const length = w * (0.075 + index * 0.014)
+
+                    ctx.beginPath()
+                    ctx.moveTo(startX, y)
+                    ctx.lineTo(startX - length, y)
+                    ctx.lineWidth = 1.5
+                    ctx.strokeStyle = "rgba(35,31,34,0.22)"
+                    ctx.stroke()
+                }
+
+                const flare =
+                    0.5
+                    + Math.sin(carButton.drivePhase * Math.PI * 2.0)
+                      * 0.16
+
+                ctx.beginPath()
+                ctx.moveTo(w * 0.90, h * 0.58)
+                ctx.lineTo(w * (0.96 + flare * 0.025), h * 0.54)
+                ctx.lineTo(w * (0.95 + flare * 0.024), h * 0.63)
+                ctx.closePath()
+                ctx.fillStyle = "rgba(78,129,255,0.26)"
+                ctx.fill()
+            }
+        }
+
+        Image {
+            id: carImage
+
+            width: parent.width
+            height: parent.height
+            x: (parent.width - width) * 0.5
+            source:
+                "qrc:/qt/qml/Aurora/App/assets/controls/lamborghini-reference.png"
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            mipmap: true
+            asynchronous: false
+            cache: true
+            y:
+                (parent.height - height) * 0.5
+                + (carButton.playing
+                   ? carButton.suspensionPhase * 1.8
+                   : 0.0)
+            scale:
+                1.0
+                + carButton.hoverAmount * 0.02
+                + (carButton.playing
+                   ? Math.sin(carButton.drivePhase * Math.PI * 2.0)
+                     * 0.006
+                   : 0.0)
+        }
+
+        Canvas {
+            id: wheelsCanvas
+
+            anchors.fill: parent
+            antialiasing: true
+            renderTarget: Canvas.Image
+
+            onPaint: {
+                const ctx = getContext("2d")
+                const w = width
+                const h = height
+                ctx.clearRect(0, 0, w, h)
+
+                const wheels = [
+                    { x: w * 0.164, y: h * 0.63, r: h * 0.105 },
+                    { x: w * 0.612, y: h * 0.63, r: h * 0.112 }
+                ]
+
+                for (let index = 0; index < wheels.length; ++index) {
+                    const wheel = wheels[index]
+
+                    ctx.save()
+                    ctx.translate(wheel.x, wheel.y)
+                    ctx.rotate(
+                        carButton.wheelPhase
+                        * Math.PI / 180.0)
+
+                    ctx.lineWidth = 1.15
+                    ctx.strokeStyle =
+                        carButton.playing
+                        ? "rgba(235,240,245,0.72)"
+                        : "rgba(235,240,245,0.28)"
+
+                    for (let spoke = 0; spoke < 7; ++spoke) {
+                        ctx.rotate(Math.PI * 2.0 / 7.0)
+                        ctx.beginPath()
+                        ctx.moveTo(0, -wheel.r * 0.18)
+                        ctx.lineTo(0, -wheel.r * 0.58)
+                        ctx.stroke()
+                    }
+
+                    ctx.restore()
+                }
+            }
+        }
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: -3
+            visible: !carButton.playing
+            text: "Ⅱ"
+            color: Qt.rgba(25 / 255.0, 21 / 255.0, 23 / 255.0, 0.48)
+            font.pixelSize: 13
+            font.weight: Font.DemiBold
+        }
+
+        onDrivePhaseChanged: {
+            motionCanvas.requestPaint()
+            wheelsCanvas.requestPaint()
+        }
+
+        onWheelPhaseChanged: wheelsCanvas.requestPaint()
+        onPlayingChanged: {
+            motionCanvas.requestPaint()
+            wheelsCanvas.requestPaint()
+        }
+    }
+    // AUR-CONTROLS-REFERENCE-PACK-04:END
 
     NumberAnimation on presencePhase {
         from: 0.0
@@ -330,6 +999,10 @@ Item {
         interval: root.presentationMode ? 2400 : 3200
         repeat: false
         onTriggered: {
+            if (networkTransition.running) {
+                controlHideTimer.restart()
+                return
+            }
             if (!root.forceControlsVisible
                     && !root.libraryMenuExpanded
                     && !root.tracksPanelExpanded
@@ -349,7 +1022,17 @@ Item {
         id: crystalSettleTimer
         interval: 180
         repeat: false
-        onTriggered: root.transitionCrystalSettling = false
+        onTriggered: {
+            root.transitionCrystalSettling = false
+            root.queueArtworkIllustrationRefresh(false)
+        }
+    }
+
+    Timer {
+        id: playbackStartPollTimer
+        interval: 120
+        repeat: true
+        onTriggered: root.checkNetworkPlaybackStarted()
     }
 
     FileDialog {
@@ -395,7 +1078,18 @@ Item {
 
         function onMusicTracksResolved(tracks) {
             Lyrics.rememberTracks(tracks)
+            Lyrics.warmForTracks(tracks)
             AudioRuntime.setQueueWithMetadata(tracks)
+            if (root.resolvingNetworkTransitionTarget) {
+                root.resolvingNetworkTransitionTarget = false
+                if (tracks.length > 0) {
+                    root.transitionTargetUrl = tracks[0].url
+                    playbackStartPollTimer.restart()
+                } else {
+                    networkTransition.cancelToCurrent()
+                    root.resetNetworkTransitionRuntime()
+                }
+            }
             root.appendResolvedSource = false
             root.sourcePanelExpanded = false
             root.tracksPanelExpanded = false
@@ -403,6 +1097,7 @@ Item {
 
         function onMusicTracksAppendResolved(tracks) {
             Lyrics.rememberTracks(tracks)
+            Lyrics.warmForTracks(tracks)
             AudioRuntime.appendQueueWithMetadata(tracks)
             root.appendResolvedSource = false
         }
@@ -411,10 +1106,29 @@ Item {
     function queueArtworkIllustrationRefresh(resetAttempts) {
         if (resetAttempts)
             root.artworkRefreshAttempt = 0
+        const deferForTransition =
+                networkTransition.running
+                && networkTransition.transitionState !== "WaitingForAudio"
+                && networkTransition.transitionState !== "PlaybackRevealing"
+        artworkRefreshTimer.interval =
+                deferForTransition
+                ? 280
+                : (networkTransition.running ? 30 : 90)
         artworkRefreshTimer.restart()
     }
 
     function refreshArtworkIllustration() {
+        const deferForTransition =
+                networkTransition.running
+                && networkTransition.transitionState !== "WaitingForAudio"
+                && networkTransition.transitionState !== "PlaybackRevealing"
+
+        if (deferForTransition) {
+            artworkRefreshTimer.interval = 280
+            artworkRefreshTimer.restart()
+            return
+        }
+
         const source = root.observedArtworkSource
         const identity = root.observedArtworkIdentity
 
@@ -431,21 +1145,24 @@ Item {
             return
         if (ArtworkIllustration.ready || ArtworkIllustration.loading)
             return
-        if (root.artworkRefreshAttempt >= 3)
-            return
+        // AUR-SOURCE-ARTWORK-RECOVERY-PACK-01:QML-RETRY
+        if (root.artworkRefreshAttempt >= 5)
+            return;
 
         root.artworkRefreshAttempt += 1
         artworkRetryTimer.interval =
                 root.artworkRefreshAttempt === 1 ? 280
                 : root.artworkRefreshAttempt === 2 ? 900
-                : 1800
+                : root.artworkRefreshAttempt === 3 ? 1800
+                : root.artworkRefreshAttempt === 4 ? 3500
+                : 6500
         artworkRetryTimer.restart()
     }
 
     Timer {
         id: artworkRefreshTimer
 
-        interval: 60
+        interval: 90
         repeat: false
         onTriggered: root.refreshArtworkIllustration()
     }
@@ -459,6 +1176,7 @@ Item {
     }
 
     onObservedArtworkRequestKeyChanged: {
+        ArtworkIllustration.clear()
         root.queueArtworkIllustrationRefresh(true)
     }
 
@@ -469,14 +1187,37 @@ Item {
             Lyrics.loadForSource(AudioRuntime.source)
             Lyrics.setPosition(AudioRuntime.position)
             root.queueArtworkIllustrationRefresh(false)
+            root.checkNetworkPlaybackStarted()
         }
 
         function onTrackChanged() {
+            if (networkTransition.running
+                    && !root.transitionPlaybackRequested
+                    && networkTransition.transitionState !== "Idle") {
+                networkTransition.cancelToCurrent()
+                root.resetNetworkTransitionRuntime()
+            }
             root.queueArtworkIllustrationRefresh(true)
         }
 
         function onPositionChanged() {
             Lyrics.setPosition(AudioRuntime.position)
+            root.checkNetworkPlaybackStarted()
+        }
+
+        function onPlaybackStateChanged() {
+            root.checkNetworkPlaybackStarted()
+        }
+
+        function onErrorChanged() {
+            if (networkTransition.running
+                    && networkTransition.transitionState === "WaitingForAudio"
+                    && AudioRuntime.errorString.length > 0) {
+                networkTransition.cancelToCurrent()
+                root.resetNetworkTransitionRuntime()
+                root.transitionLanding = false
+                root.transitionCrystalSettling = false
+            }
         }
     }
 
@@ -1772,7 +2513,7 @@ Item {
                             enabled: root.visiblePanelTrackCount > 0 && !MusicSources.resolving
                             onTapped: {
                                 if (root.sourceTracksMode)
-                                    MusicSources.resolveOnlineTracksFrom(0)
+                                    root.requestOnlineTrackTransition(0)
                                 else
                                     AudioRuntime.setQueue(LocalLibrary.visiblePlayableUrls())
                             }
@@ -1831,8 +2572,10 @@ Item {
                         required property string title
                         required property string artist
                         required property string album
+                        required property string artworkUrl
                         required property string fileName
                         required property string filePath
+                        required property url url
 
                         width: libraryList.width
                         height: 58
@@ -1882,8 +2625,13 @@ Item {
 
                         TapHandler {
                             onTapped: {
-                                AudioRuntime.setQueue(LocalLibrary.visiblePlayableUrlsStartingAt(index))
-                                root.tracksPanelExpanded = false
+                                root.requestLocalTrackTransition(index, {
+                                    title: title.length > 0 ? title : fileName,
+                                    artist: artist,
+                                    album: album,
+                                    url: url.toString(),
+                                    sourceId: filePath
+                                })
                             }
                         }
                     }
@@ -2044,38 +2792,41 @@ Item {
 
         anchors.fill: parent
         anchors.leftMargin: root.compactViewport
-                            ? (root.controlsVisible ? 44 : 30)
-                            : (root.controlsVisible ? 72 : 48)
+                            ? (root.layoutControlsVisible ? 44 : 30)
+                            : (root.layoutControlsVisible ? 72 : 48)
         anchors.rightMargin: root.compactViewport
-                             ? (root.controlsVisible ? 44 : 30)
-                             : (root.controlsVisible ? 72 : 48)
+                             ? (root.layoutControlsVisible ? 44 : 30)
+                             : (root.layoutControlsVisible ? 72 : 48)
         anchors.topMargin: root.compactViewport
-                           ? (root.controlsVisible ? 54 : 34)
-                           : (root.controlsVisible ? 62 : 48)
+                           ? (root.layoutControlsVisible ? 54 : 34)
+                           : (root.layoutControlsVisible ? 62 : 48)
         anchors.bottomMargin: root.compactViewport
-                              ? (root.controlsVisible ? 50 : 34)
-                              : (root.controlsVisible ? 58 : 42)
-        opacity: !liquidTrackTransition.running
-                 ? 1.0
-                 : root.transitionLanding ? 1.0 : 0.02
-        scale: !liquidTrackTransition.running
-               ? 1.0
-               : root.transitionLanding ? 1.0 : 0.972
+                              ? (root.layoutControlsVisible ? 50 : 34)
+                              : (root.layoutControlsVisible ? 58 : 42)
+        opacity: networkTransition.running
+                 && networkTransition.transitionState !== "PlaybackRevealing"
+                 ? networkTransition.panelOpacity
+                 : 1.0
+        scale: networkTransition.running ? networkTransition.panelScale : 1.0
+        enabled: !networkTransition.running
+                 || networkTransition.transitionState === "PlaybackRevealing"
+                 || networkTransition.transitionState === "Idle"
         z: 4
 
         readonly property bool wide: width >= 760
         readonly property real illustrationX:
-            wide ? width * (root.controlsVisible ? 0.27 : 0.25) : 0
+            wide ? width * (root.layoutControlsVisible ? 0.27 : 0.25) : 0
         readonly property real illustrationY:
             wide ? height * 0.08 : height * 0.03
         readonly property real illustrationWidth:
-            wide ? width * (root.controlsVisible ? 0.72 : 0.75) : width
+            wide ? width * (root.layoutControlsVisible ? 0.72 : 0.75) : width
         readonly property real illustrationHeight:
-            wide ? height * (root.controlsVisible ? 0.76 : 0.79) : height * 0.58
+            wide ? height * (root.layoutControlsVisible ? 0.76 : 0.79) : height * 0.58
         readonly property real identityWidth:
             wide ? Math.min(340, width * 0.29) : Math.min(560, width * 0.82)
 
         Behavior on opacity {
+            enabled: networkTransition.transitionState !== "PlaybackRevealing"
             OpacityAnimator {
                 duration: root.reducedMotion ? AuroraTokens.motionSoft : 440
                 easing.type: Easing.OutQuint
@@ -2121,7 +2872,9 @@ Item {
             midEnergy: root.transitionCrystalSettling ? 0.0 : AudioRuntime.midEnergy
             highEnergy: root.transitionCrystalSettling ? 0.0 : AudioRuntime.highEnergy
             transientEnergy: root.transitionCrystalSettling ? 0.0 : AudioRuntime.transientEnergy
-            opacity: root.identityVisible ? 1.0 : 0.0
+            opacity: root.identityVisible
+                     ? root.transitionLayerAmount(0.16, 0.62)
+                     : 0.0
 
             Behavior on x {
                 enabled: !root.reducedMotion
@@ -2152,10 +2905,11 @@ Item {
                ? parent.width * 0.06
                : (parent.width - playerContent.identityWidth) / 2
             y: playerContent.wide
-               ? parent.height * (root.controlsVisible ? 0.20 : 0.23)
+               ? parent.height * (root.layoutControlsVisible ? 0.20 : 0.23)
                : illustrationSpace.y + illustrationSpace.height + 18
             width: playerContent.identityWidth
             height: playerContent.wide ? Math.min(330, parent.height * 0.58) : 220
+            opacity: root.transitionLayerAmount(0.36, 0.86)
 
             Rectangle {
                 width: Math.min(146, parent.width * 0.44)
@@ -2267,49 +3021,40 @@ Item {
                 }
             }
 
-            Row {
+
+            // AUR-CONTROLS-REFERENCE-PACK-04:TRANSPORT-BEGIN
+            Item {
                 anchors.left: parent.left
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: playerContent.wide ? 8 : 0
-                spacing: 14
+                anchors.bottomMargin: playerContent.wide ? 0 : 0
+                width: 440
+                height: 112
+                opacity: root.transitionLayerAmount(0.66, 1.0)
+                z: 140
 
-                Rectangle {
-                    width: 44
-                    height: 38
-                    enabled: root.controlsVisible
+                MangekyoEyeButton {
+                    id: previousMangekyoButton
+
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
                     opacity: root.controlOpacity
-                    radius: 8
-                    color: root.mangaButtonFill
-                    border.width: 2
-                    border.color: root.mangaButtonBorder
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "‹"
-                        color: root.mangaText
-                        font.pixelSize: 24
-                        font.weight: Font.Medium
-                    }
-
-                    TapHandler {
-                        enabled: !liquidTrackTransition.running
-                        onTapped: root.beginTrackTransition(-1)
-                    }
+                    armed:
+                        root.controlsVisible
+                        && !networkTransition.running
+                    reducedMotion: root.reducedMotion
+                    direction: -1
+                    onActivated: root.beginTrackTransition(-1)
                 }
 
-                AuroraCore {
-                    anchors.verticalCenter: parent.verticalCenter
-                    diameter: root.controlsVisible ? 82 : 62
-                    experienceState: root.transitioning || liquidTrackTransition.running
-                                     ? AuroraTypes.CoreGathering
-                                     : AudioRuntime.coreExperienceState
-                    context: AuroraTypes.MusicSpace
-                    presenceLevel: root.controlsVisible
-                                   ? (AudioRuntime.playing ? 0.72 : AudioRuntime.hasTrack ? 0.38 : 0.24)
-                                   : (AudioRuntime.playing ? 0.42 : AudioRuntime.hasTrack ? 0.24 : 0.14)
-                    accessibilityMode: root.accessibilityMode
-                    qualityMode: root.qualityMode
-                    onRequestPlayPause: {
+                LamborghiniPlayToggle {
+                    id: lamborghiniTransportButton
+
+                    anchors.centerIn: parent
+                    playing: AudioRuntime.playing
+                    hasTrack: AudioRuntime.hasTrack
+                    reducedMotion: root.reducedMotion
+
+                    onActivated: {
                         if (AudioRuntime.hasTrack)
                             AudioRuntime.togglePlayback()
                         else
@@ -2317,30 +3062,21 @@ Item {
                     }
                 }
 
-                Rectangle {
-                    width: 44
-                    height: 38
-                    enabled: root.controlsVisible
+                MangekyoEyeButton {
+                    id: nextMangekyoButton
+
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
                     opacity: root.controlOpacity
-                    radius: 8
-                    color: root.mangaButtonFill
-                    border.width: 2
-                    border.color: root.mangaButtonBorder
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "›"
-                        color: root.mangaText
-                        font.pixelSize: 24
-                        font.weight: Font.Medium
-                    }
-
-                    TapHandler {
-                        enabled: !liquidTrackTransition.running
-                        onTapped: root.beginTrackTransition(1)
-                    }
+                    armed:
+                        root.controlsVisible
+                        && !networkTransition.running
+                    reducedMotion: root.reducedMotion
+                    direction: 1
+                    onActivated: root.beginTrackTransition(1)
                 }
             }
+            // AUR-CONTROLS-REFERENCE-PACK-04:TRANSPORT-END
 
             Behavior on x {
                 enabled: !root.reducedMotion
@@ -2365,7 +3101,8 @@ Item {
                        ? (Lyrics.nextLine.length > 0 ? 54 : 34)
                        : 0)
             visible: height > 0
-            opacity: root.controlsVisible ? 0.88 : 0.68
+            opacity: (root.controlsVisible ? 0.88 : 0.68)
+                     * root.transitionLayerAmount(0.54, 0.94)
 
             Column {
                 anchors.left: parent.left
@@ -2414,6 +3151,7 @@ Item {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             height: root.controlsVisible ? 42 : 18
+            opacity: root.transitionLayerAmount(0.68, 1.0)
 
             Text {
                 anchors.left: parent.left
@@ -2473,7 +3211,7 @@ Item {
             anchors.bottomMargin: 8
             spacing: 10
             enabled: root.controlsVisible
-            opacity: root.controlOpacity
+            opacity: root.controlOpacity * root.transitionLayerAmount(0.72, 1.0)
             scale: 0.97 + root.controlOpacity * 0.03
 
             Text {
@@ -2519,30 +3257,41 @@ Item {
             Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
             Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
         }
+
     }
 
-    LiquidTrackTransition {
-        id: liquidTrackTransition
-        anchors.fill: parent
+    MusicNetworkTransitionOverlay {
+        id: networkTransition
+        x: playerContent.x
+        y: playerContent.y
+        width: playerContent.width
+        height: playerContent.height
         accessibilityMode: root.accessibilityMode
         qualityMode: root.qualityMode
-        incomingTitle: root.displayTitle
-        incomingArtist: root.displayArtist
-        incomingArtworkSource: AudioRuntime.hasTrack
-                               ? AudioRuntime.artworkSource
-                               : "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
-        incomingColor: root.displayIdentityColor
+        colorSignature: root.displayIdentityColor
 
-        onSwitchRequested: function(direction) {
-            if (direction > 0)
-                AudioRuntime.next()
-            else
-                AudioRuntime.previous()
+        onPlaybackRequested: function(targetTrack) {
+            root.executeNetworkTransitionAction(root.activeNetworkTransitionAction)
         }
-        onLandingStarted: root.transitionLanding = true
-        onCompleted: {
+        onPlaybackTimedOut: {
+            root.resetNetworkTransitionRuntime()
+            root.transitionLanding = false
+            root.transitionCrystalSettling = false
+        }
+        onTransitionFinished: {
             root.transitionLanding = false
             crystalSettleTimer.restart()
+            root.resetNetworkTransitionRuntime()
+            root.transitionLayoutControlsVisible = root.controlsVisible
+            controlHideTimer.restart()
+
+            if (root.pendingNetworkTransitionAction !== null) {
+                const nextAction = root.pendingNetworkTransitionAction
+                root.pendingNetworkTransitionAction = null
+                Qt.callLater(function() {
+                    root.requestNetworkTransition(nextAction)
+                })
+            }
         }
     }
 

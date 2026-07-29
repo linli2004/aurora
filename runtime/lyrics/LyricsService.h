@@ -33,6 +33,7 @@ public:
     [[nodiscard]] QString cacheDirectory() const;
 
     Q_INVOKABLE void rememberTracks(const QVariantList &tracks);
+    Q_INVOKABLE void warmForTracks(const QVariantList &tracks);
     Q_INVOKABLE bool loadForSource(const QUrl &source);
     Q_INVOKABLE bool loadFromText(const QString &text);
     Q_INVOKABLE void setPosition(qint64 positionMilliseconds);
@@ -63,12 +64,14 @@ private:
     void requestOnlineLyrics(
         const TrackHint &hint,
         int generation);
+    void requestWarmOnlineLyrics(const TrackHint &hint);
     [[nodiscard]] QString cachedLyricsPath(const TrackHint &hint) const;
     void setLoading(bool loading);
     void setErrorString(const QString &message);
 
     QNetworkAccessManager *m_network = nullptr;
     QPointer<QNetworkReply> m_activeReply;
+    QHash<QString, QPointer<QNetworkReply>> m_warmReplies;
     QHash<QString, TrackHint> m_trackHints;
     QVector<Entry> m_entries;
     QString m_sourcePath;

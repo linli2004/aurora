@@ -1,5 +1,7 @@
 #include <QtTest>
 
+#include <QVariantMap>
+
 #include "runtime/lyrics/LyricsService.h"
 
 class LyricsServiceTest final : public QObject
@@ -10,6 +12,7 @@ private slots:
     void parsesAndAdvancesTimedLyrics();
     void supportsMultipleTimestampsAndOffset();
     void clearsInvalidLyrics();
+    void warmForTracksKeepsCurrentLyricsVisible();
 };
 
 void LyricsServiceTest::parsesAndAdvancesTimedLyrics()
@@ -56,6 +59,23 @@ void LyricsServiceTest::clearsInvalidLyrics()
     QVERIFY(!lyrics.hasLyrics());
     QCOMPARE(lyrics.currentLine(), QString());
     QCOMPARE(lyrics.nextLine(), QString());
+}
+
+void LyricsServiceTest::warmForTracksKeepsCurrentLyricsVisible()
+{
+    LyricsService lyrics;
+    QVERIFY(lyrics.loadFromText(QStringLiteral("[00:01.00]Current line\n")));
+    lyrics.setPosition(1200);
+    QCOMPARE(lyrics.currentLine(), QStringLiteral("Current line"));
+
+    QVariantMap track;
+    track.insert(QStringLiteral("url"), QStringLiteral("https://example.com/music/next.mp3"));
+    track.insert(QStringLiteral("source"), QStringLiteral("qq"));
+    track.insert(QStringLiteral("songId"), QStringLiteral("next"));
+    lyrics.warmForTracks(QVariantList { track });
+
+    QCOMPARE(lyrics.currentLine(), QStringLiteral("Current line"));
+    QVERIFY(lyrics.hasLyrics());
 }
 
 QTEST_GUILESS_MAIN(LyricsServiceTest)

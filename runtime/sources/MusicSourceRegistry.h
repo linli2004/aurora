@@ -135,6 +135,8 @@ private:
         const QString &previousError,
         bool continueWithImportedSources);
     void requestCurrentMusicUrl();
+    void resolvePendingArtworkThenFinish(
+        const QString &musicUrl);
     void failCurrentResolver(const QString &message);
     void finishCurrentResolver(const QString &musicUrl);
     void setBusy(bool busy);
@@ -161,6 +163,7 @@ private:
     bool m_resolving = false;
     bool m_resolvingPlaylist = false;
     bool m_triedNetEasePublicMedia = false;
+    bool m_artworkLookupAttempted = false;
     bool m_playlistPlaybackStarted = false;
     QString m_statusText;
     QString m_errorString;
