@@ -29,7 +29,12 @@ Item {
     property real phase: 0.0
     property real explosion: 0.0
     property real pitchMemory: 0.0
+    property bool shardsArmed: false
 
+    readonly property bool artworkSourceAvailable:
+        artworkIllustrationSource.toString().length > 0
+    readonly property bool artworkImageReady:
+        artworkImage.status === Image.Ready
     readonly property int shardColumns:
         qualityMode === AuroraTypes.Immersive ? 18
         : qualityMode === AuroraTypes.Eco ? 9 : 15
@@ -303,12 +308,14 @@ Item {
         anchors.centerIn: parent
         width: parent.width * 0.94
         height: parent.height * 0.94
-        source: root.artworkIllustrationSource
-        visible: root.artworkReady
+        source: root.artworkSourceAvailable
+                ? root.artworkIllustrationSource
+                : ""
+        visible: root.artworkSourceAvailable
         fillMode: Image.PreserveAspectFit
         smooth: true
         mipmap: true
-        asynchronous: true
+        asynchronous: false
         cache: false
         opacity: status === Image.Ready
                  ? Math.max(
@@ -334,7 +341,23 @@ Item {
         }
 
         onStatusChanged: {
+            if (status === Image.Ready) {
+                shardArmTimer.restart()
+            } else {
+                root.shardsArmed = false
+                shardArmTimer.stop()
+            }
             motionCanvas.requestPaint()
+        }
+    }
+
+    Timer {
+        id: shardArmTimer
+
+        interval: 180
+        repeat: false
+        onTriggered: {
+            root.shardsArmed = artworkImage.status === Image.Ready
         }
     }
 
@@ -342,13 +365,15 @@ Item {
         id: shatteredArtwork
 
         anchors.fill: parent
-        visible: artworkImage.status === Image.Ready
-                 && root.artworkReady
+        visible: root.artworkImageReady
+                 && root.shardsArmed
                  && root.fragmentProgress > 0.006
         z: artworkImage.z + 1
 
         Repeater {
-            model: root.shardColumns * root.shardRows
+            model: shatteredArtwork.visible
+                   ? root.shardColumns * root.shardRows
+                   : 0
 
             delegate: Item {
                 id: shard
@@ -603,7 +628,9 @@ Item {
 
                     Image {
                         anchors.fill: parent
-                        source: root.artworkIllustrationSource
+                        source: root.artworkImageReady
+                                ? root.artworkIllustrationSource
+                                : ""
                         sourceSize.width: root.sourcePixelWidth
                         sourceSize.height: root.sourcePixelHeight
                         sourceClipRect: Qt.rect(
@@ -615,7 +642,7 @@ Item {
                         smooth: true
                         mipmap: true
                         cache: true
-                        asynchronous: true
+                        asynchronous: false
                     }
                 }
 
@@ -642,7 +669,7 @@ Item {
                     anchors.fill: parent
                     source: shardSource
                     maskSource: shardMask
-                    cached: true
+                    cached: false
                 }
 
                 Canvas {
@@ -673,7 +700,7 @@ Item {
         id: motionCanvas
 
         anchors.fill: parent
-        visible: !root.artworkReady
+        visible: !root.artworkImageReady
         antialiasing: true
         opacity: 1.0
         onPaint: root.paintScene(getContext("2d"))
@@ -685,7 +712,7 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 16
-        visible: root.artworkAvailable && !root.artworkReady
+        visible: root.artworkAvailable && !root.artworkImageReady
         text: "正在读取专辑视觉"
         color: root.ink(0.32)
         font.pixelSize: 11
@@ -694,6 +721,13 @@ Item {
     onSeedChanged: motionCanvas.requestPaint()
     onTemplateIndexChanged: motionCanvas.requestPaint()
     onArtworkReadyChanged: motionCanvas.requestPaint()
+    onArtworkIllustrationSourceChanged: {
+        root.shardsArmed = false
+        root.explosion = 0.0
+        root.pitchMemory = 0.0
+        shardArmTimer.stop()
+        motionCanvas.requestPaint()
+    }
     onArtworkFocalXChanged: motionCanvas.requestPaint()
     onArtworkFocalYChanged: motionCanvas.requestPaint()
     onArtworkEdgeDensityChanged: motionCanvas.requestPaint()
