@@ -13,6 +13,7 @@
 #include "runtime/audio/AudioFeatureAnalyzer.h"
 #include "runtime/audio/AudioQueue.h"
 #include "runtime/audio/LocalTrackIdentity.h"
+#include "runtime/cache/MediaCacheService.h"
 
 class AudioRuntime final : public QObject
 {
@@ -44,6 +45,9 @@ class AudioRuntime final : public QObject
     Q_PROPERTY(int currentIndex READ currentIndex NOTIFY queueChanged)
     Q_PROPERTY(int queueCount READ queueCount NOTIFY queueChanged)
     Q_PROPERTY(QString errorString READ errorString NOTIFY errorChanged)
+    Q_PROPERTY(QString mediaCacheDirectory READ mediaCacheDirectory CONSTANT)
+    Q_PROPERTY(qint64 mediaCacheBytes READ mediaCacheBytes NOTIFY mediaCacheChanged)
+    Q_PROPERTY(qint64 mediaCacheLimitBytes READ mediaCacheLimitBytes CONSTANT)
     Q_PROPERTY(int coreExperienceState READ coreExperienceState NOTIFY semanticStateChanged)
     Q_PROPERTY(qreal audioLevel READ audioLevel NOTIFY audioFeaturesChanged)
     Q_PROPERTY(qreal bassEnergy READ bassEnergy NOTIFY audioFeaturesChanged)
@@ -82,6 +86,9 @@ public:
     [[nodiscard]] int currentIndex() const;
     [[nodiscard]] int queueCount() const;
     [[nodiscard]] QString errorString() const;
+    [[nodiscard]] QString mediaCacheDirectory() const;
+    [[nodiscard]] qint64 mediaCacheBytes() const;
+    [[nodiscard]] qint64 mediaCacheLimitBytes() const;
     [[nodiscard]] int coreExperienceState() const;
     [[nodiscard]] qreal audioLevel() const;
     [[nodiscard]] qreal bassEnergy() const;
@@ -104,6 +111,7 @@ public:
     Q_INVOKABLE void next();
     Q_INVOKABLE void previous();
     Q_INVOKABLE void seekRelative(qint64 deltaMilliseconds);
+    Q_INVOKABLE void clearMediaCache();
 
 public slots:
     void setPosition(qint64 position);
@@ -119,6 +127,7 @@ signals:
     void mediaStatusChanged();
     void queueChanged();
     void errorChanged();
+    void mediaCacheChanged();
     void semanticStateChanged();
     void audioFeaturesChanged();
     void audioReactiveAvailabilityChanged();
@@ -143,6 +152,7 @@ private:
     QAudioOutput m_audioOutput;
     QAudioBufferOutput m_audioBufferOutput;
     AudioFeatureAnalyzer m_featureAnalyzer;
+    MediaCacheService m_mediaCache;
     QTimer m_sessionPersistTimer;
     QTimer m_restorePositionTimer;
     AudioQueue m_queue;

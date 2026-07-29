@@ -121,6 +121,8 @@ AudioRuntime::AudioRuntime(QObject *parent)
             this, &AudioRuntime::audioFeaturesChanged);
     connect(&m_featureAnalyzer, &AudioFeatureAnalyzer::availabilityChanged,
             this, &AudioRuntime::audioReactiveAvailabilityChanged);
+    connect(&m_mediaCache, &MediaCacheService::cacheChanged,
+            this, &AudioRuntime::mediaCacheChanged);
 
     connect(&m_player, &QMediaPlayer::sourceChanged, this, [this] { emit sourceChanged(); });
     connect(&m_player, &QMediaPlayer::durationChanged, this, [this] {
@@ -197,7 +199,7 @@ AudioRuntime::~AudioRuntime()
 
 QUrl AudioRuntime::source() const
 {
-    return m_player.source();
+    return m_queue.currentUrl();
 }
 
 QString AudioRuntime::trackId() const
@@ -326,6 +328,21 @@ int AudioRuntime::queueCount() const
 QString AudioRuntime::errorString() const
 {
     return m_errorString;
+}
+
+QString AudioRuntime::mediaCacheDirectory() const
+{
+    return m_mediaCache.directory();
+}
+
+qint64 AudioRuntime::mediaCacheBytes() const
+{
+    return m_mediaCache.sizeBytes();
+}
+
+qint64 AudioRuntime::mediaCacheLimitBytes() const
+{
+    return m_mediaCache.limitBytes();
 }
 
 int AudioRuntime::coreExperienceState() const
@@ -494,9 +511,9 @@ void AudioRuntime::clearQueue()
     m_pendingRestorePosition = -1;
     m_featureAnalyzer.reset();
     m_player.stop();
-    m_player.setSource(QUrl());
     m_queueIdentityOverrides.clear();
     m_queue.clear();
+    m_player.setSource(QUrl());
     applyTrackIdentity({});
     setErrorString({});
     emit queueChanged();
@@ -556,6 +573,11 @@ void AudioRuntime::previous()
 void AudioRuntime::seekRelative(qint64 deltaMilliseconds)
 {
     setPosition(position() + deltaMilliseconds);
+}
+
+void AudioRuntime::clearMediaCache()
+{
+    m_mediaCache.clear();
 }
 
 void AudioRuntime::setPosition(qint64 position)
@@ -726,7 +748,9 @@ void AudioRuntime::loadCurrent(bool autoplay, qint64 initialPosition)
     applyTrackIdentity(overrideIdentity.trackId.isEmpty()
                            ? LocalTrackIdentityResolver::fallbackFor(url)
                            : overrideIdentity);
-    m_player.setSource(url);
+    const QUrl playbackSource = m_mediaCache.playbackSource(url);
+    m_player.setSource(playbackSource);
+    m_mediaCache.warm(url);
     emit semanticStateChanged();
 
     if (autoplay)

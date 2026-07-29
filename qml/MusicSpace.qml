@@ -22,6 +22,17 @@ Item {
     property bool transitionCrystalSettling: false
     property bool presentationMode: false
     property real presencePhase: 0.0
+    property int artworkRefreshAttempt: 0
+
+    readonly property url observedArtworkSource:
+        AudioRuntime.artworkSource
+    readonly property string observedArtworkIdentity:
+        AudioRuntime.trackId.length > 0
+        ? AudioRuntime.trackId
+        : root.displayTitle + "|" + root.displayArtist
+    readonly property string observedArtworkRequestKey:
+        observedArtworkSource.toString()
+        + "|" + observedArtworkIdentity
 
     readonly property bool compactViewport: width < 1080 || height < 700
     readonly property bool cinematicWide: width >= 920
@@ -105,8 +116,12 @@ Item {
     signal closeRequested()
 
     function identityAnchorRect() {
-        const origin = mainCrystal.mapToItem(root, 0, 0)
-        return Qt.rect(origin.x, origin.y, mainCrystal.width, mainCrystal.height)
+        const anchorX = illustrationSpace.width * 0.34
+        const anchorY = illustrationSpace.height * 0.20
+        const anchorWidth = illustrationSpace.width * 0.42
+        const anchorHeight = illustrationSpace.height * 0.60
+        const origin = illustrationSpace.mapToItem(root, anchorX, anchorY)
+        return Qt.rect(origin.x, origin.y, anchorWidth, anchorHeight)
     }
 
     function formatTime(milliseconds) {
@@ -379,6 +394,7 @@ Item {
         }
 
         function onMusicTracksResolved(tracks) {
+            Lyrics.rememberTracks(tracks)
             AudioRuntime.setQueueWithMetadata(tracks)
             root.appendResolvedSource = false
             root.sourcePanelExpanded = false
@@ -386,9 +402,104 @@ Item {
         }
 
         function onMusicTracksAppendResolved(tracks) {
+            Lyrics.rememberTracks(tracks)
             AudioRuntime.appendQueueWithMetadata(tracks)
             root.appendResolvedSource = false
         }
+    }
+
+    function queueArtworkIllustrationRefresh(resetAttempts) {
+        if (resetAttempts)
+            root.artworkRefreshAttempt = 0
+        artworkRefreshTimer.restart()
+    }
+
+    function refreshArtworkIllustration() {
+        const source = root.observedArtworkSource
+        const identity = root.observedArtworkIdentity
+
+        if (source.toString().length === 0) {
+            ArtworkIllustration.clear()
+            return
+        }
+
+        ArtworkIllustration.load(source, identity)
+    }
+
+    function scheduleArtworkRetry() {
+        if (root.observedArtworkSource.toString().length === 0)
+            return
+        if (ArtworkIllustration.ready || ArtworkIllustration.loading)
+            return
+        if (root.artworkRefreshAttempt >= 3)
+            return
+
+        root.artworkRefreshAttempt += 1
+        artworkRetryTimer.interval =
+                root.artworkRefreshAttempt === 1 ? 280
+                : root.artworkRefreshAttempt === 2 ? 900
+                : 1800
+        artworkRetryTimer.restart()
+    }
+
+    Timer {
+        id: artworkRefreshTimer
+
+        interval: 60
+        repeat: false
+        onTriggered: root.refreshArtworkIllustration()
+    }
+
+    Timer {
+        id: artworkRetryTimer
+
+        interval: 280
+        repeat: false
+        onTriggered: root.refreshArtworkIllustration()
+    }
+
+    onObservedArtworkRequestKeyChanged: {
+        root.queueArtworkIllustrationRefresh(true)
+    }
+
+    Connections {
+        target: AudioRuntime
+
+        function onSourceChanged() {
+            Lyrics.loadForSource(AudioRuntime.source)
+            Lyrics.setPosition(AudioRuntime.position)
+            root.queueArtworkIllustrationRefresh(false)
+        }
+
+        function onTrackChanged() {
+            root.queueArtworkIllustrationRefresh(true)
+        }
+
+        function onPositionChanged() {
+            Lyrics.setPosition(AudioRuntime.position)
+        }
+    }
+
+    Connections {
+        target: ArtworkIllustration
+
+        function onStateChanged() {
+            if (ArtworkIllustration.ready) {
+                root.artworkRefreshAttempt = 0
+                return
+            }
+
+            if (!ArtworkIllustration.loading
+                && ArtworkIllustration.errorString.length > 0) {
+                root.scheduleArtworkRetry()
+            }
+        }
+    }
+
+    Component.onCompleted: {
+        Lyrics.loadForSource(AudioRuntime.source)
+        Lyrics.setPosition(AudioRuntime.position)
+        root.queueArtworkIllustrationRefresh(true)
     }
 
     MouseArea {
@@ -401,7 +512,9 @@ Item {
 
     MangaBackdrop {
         anchors.fill: parent
-        opacity: root.controlsVisible ? 0.62 : 0.42
+        opacity: ArtworkIllustration.ready
+                 ? (root.controlsVisible ? 0.11 : 0.055)
+                 : (root.controlsVisible ? 0.30 : 0.18)
         accentColor: root.displayIdentityColor
         secondaryColor: AuroraTokens.memoryAccent
         energy: (AudioRuntime.playing ? 0.48 : AudioRuntime.hasTrack ? 0.30 : 0.16)
@@ -427,7 +540,7 @@ Item {
         paperMode: true
         opacity: root.flowSceneEnabled
                  ? 0.0
-                 : (root.controlsVisible ? 0.24 : 0.38)
+                 : (root.controlsVisible ? 0.08 : 0.14)
 
         Behavior on opacity {
             NumberAnimation {
@@ -453,9 +566,11 @@ Item {
         highEnergy: AudioRuntime.highEnergy
         transientEnergy: AudioRuntime.transientEnergy
         paperMode: true
-        opacity: root.flowSceneEnabled
-                 ? (root.controlsVisible ? 0.24 : 0.34)
-                 : 0.0
+        opacity: ArtworkIllustration.ready
+                 ? (root.flowSceneEnabled ? 0.025 : 0.0)
+                 : (root.flowSceneEnabled
+                    ? (root.controlsVisible ? 0.08 : 0.12)
+                    : 0.0)
 
         Behavior on opacity {
             NumberAnimation {
@@ -471,7 +586,9 @@ Item {
         id: cinematicColorField
 
         anchors.fill: parent
-        opacity: root.controlsVisible ? 0.54 : 0.84
+        opacity: ArtworkIllustration.ready
+                 ? (root.controlsVisible ? 0.08 : 0.12)
+                 : (root.controlsVisible ? 0.18 : 0.28)
 
         Repeater {
             model: 3
@@ -1947,26 +2064,16 @@ Item {
         z: 4
 
         readonly property bool wide: width >= 760
-        readonly property real resolvedCrystalSize:
-            wide
-            ? Math.min(root.compactViewport
-                       ? (root.controlsVisible ? 330 : 382)
-                       : (root.controlsVisible ? 372 : 432),
-                       height * (root.controlsVisible ? 0.62 : 0.72))
-            : Math.min(root.controlsVisible ? 340 : 390,
-                       width * 0.72,
-                       height * 0.52)
-        readonly property real resolvedCrystalX:
-            wide
-            ? width * (root.controlsVisible ? 0.62 : 0.66)
-              - resolvedCrystalSize / 2
-            : width / 2 - resolvedCrystalSize / 2
-        readonly property real resolvedCrystalY:
-            wide
-            ? height * 0.47 - resolvedCrystalSize / 2
-            : height * 0.08
+        readonly property real illustrationX:
+            wide ? width * (root.controlsVisible ? 0.27 : 0.25) : 0
+        readonly property real illustrationY:
+            wide ? height * 0.08 : height * 0.03
+        readonly property real illustrationWidth:
+            wide ? width * (root.controlsVisible ? 0.72 : 0.75) : width
+        readonly property real illustrationHeight:
+            wide ? height * (root.controlsVisible ? 0.76 : 0.79) : height * 0.58
         readonly property real identityWidth:
-            wide ? Math.min(390, width * 0.36) : Math.min(560, width * 0.82)
+            wide ? Math.min(340, width * 0.29) : Math.min(560, width * 0.82)
 
         Behavior on opacity {
             OpacityAnimator {
@@ -1982,26 +2089,31 @@ Item {
             }
         }
 
-        AuroraCrystal {
-            id: mainCrystal
+        MusicIllustrationSpace {
+            id: illustrationSpace
 
-            x: playerContent.resolvedCrystalX
-            y: playerContent.resolvedCrystalY
-            crystalSize: playerContent.resolvedCrystalSize
+            x: playerContent.illustrationX
+            y: playerContent.illustrationY
+            width: playerContent.illustrationWidth
+            height: playerContent.illustrationHeight
             title: root.displayTitle
             artist: root.displayArtist
-            artworkSource: AudioRuntime.hasTrack
-                           ? AudioRuntime.artworkSource
-                           : "qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png"
+            trackIdentity: AudioRuntime.trackId.length > 0
+                           ? AudioRuntime.trackId
+                           : root.displayTitle + "|" + root.displayArtist
+            artworkAvailable: AudioRuntime.artworkSource.toString().length > 0
+                              && AudioRuntime.identityProvenance !== "Generated Identity"
+            artworkIllustrationSource: ArtworkIllustration.illustrationSource
+            artworkReady: ArtworkIllustration.ready
+            artworkFocalX: ArtworkIllustration.focalX
+            artworkFocalY: ArtworkIllustration.focalY
+            artworkEdgeDensity: ArtworkIllustration.edgeDensity
+            artworkContrast: ArtworkIllustration.contrast
+            artworkParticles: ArtworkIllustration.particleSamples
             colorSignature: root.displayIdentityColor
-            experienceState: root.transitioning
-                             ? AuroraTypes.CrystalTransitioning
-                             : AuroraTypes.CrystalImmersive
-            context: AuroraTypes.MusicSpace
-            accessibilityMode: root.accessibilityMode
+            playing: AudioRuntime.playing
+            reducedMotion: root.reducedMotion
             qualityMode: root.qualityMode
-            heroMode: true
-            mangaMode: true
             audioReactiveAvailable: AudioRuntime.audioReactiveAvailable
                                     && !root.transitionCrystalSettling
             audioLevel: root.transitionCrystalSettling ? 0.0 : AudioRuntime.audioLevel
@@ -2013,19 +2125,25 @@ Item {
 
             Behavior on x {
                 enabled: !root.reducedMotion
-                NumberAnimation { duration: 520; easing.type: Easing.OutQuint }
+                NumberAnimation { duration: 560; easing.type: Easing.OutQuint }
             }
             Behavior on y {
                 enabled: !root.reducedMotion
-                NumberAnimation { duration: 520; easing.type: Easing.OutQuint }
+                NumberAnimation { duration: 560; easing.type: Easing.OutQuint }
             }
-            Behavior on crystalSize {
-                NumberAnimation { duration: 520; easing.type: Easing.OutQuint }
+            Behavior on width {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 560; easing.type: Easing.OutQuint }
+            }
+            Behavior on height {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 560; easing.type: Easing.OutQuint }
             }
             Behavior on opacity {
                 NumberAnimation { duration: AuroraTokens.motionSoft; easing.type: Easing.OutCubic }
             }
         }
+
 
         Item {
             id: identityCopy
@@ -2034,8 +2152,8 @@ Item {
                ? parent.width * 0.06
                : (parent.width - playerContent.identityWidth) / 2
             y: playerContent.wide
-               ? parent.height * (root.controlsVisible ? 0.22 : 0.25)
-               : mainCrystal.y + mainCrystal.height + 24
+               ? parent.height * (root.controlsVisible ? 0.20 : 0.23)
+               : illustrationSpace.y + illustrationSpace.height + 18
             width: playerContent.identityWidth
             height: playerContent.wide ? Math.min(330, parent.height * 0.58) : 220
 
@@ -2235,6 +2353,61 @@ Item {
         }
 
         Item {
+            id: lyricBand
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: timeTrace.top
+            anchors.bottomMargin: root.controlsVisible ? 12 : 8
+            height: Lyrics.loading
+                    ? 34
+                    : (Lyrics.hasLyrics && Lyrics.currentLine.length > 0
+                       ? (Lyrics.nextLine.length > 0 ? 54 : 34)
+                       : 0)
+            visible: height > 0
+            opacity: root.controlsVisible ? 0.88 : 0.68
+
+            Column {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: playerContent.wide ? parent.width * 0.05 : 18
+                anchors.rightMargin: playerContent.wide ? parent.width * 0.18 : 18
+                spacing: 5
+
+                Text {
+                    width: parent.width
+                    text: Lyrics.loading ? "正在读取歌词…" : Lyrics.currentLine
+                    color: root.mangaText
+                    font.pixelSize: root.controlsVisible ? 16 : 15
+                    font.weight: Font.Medium
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 1
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    width: parent.width
+                    visible: !Lyrics.loading && text.length > 0
+                    text: Lyrics.nextLine
+                    color: root.mangaMutedText
+                    opacity: 0.50
+                    font.pixelSize: 12
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 1
+                    elide: Text.ElideRight
+                }
+            }
+
+            Behavior on height {
+                NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+            }
+            Behavior on opacity {
+                NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+            }
+        }
+
+        Item {
             id: timeTrace
 
             anchors.left: parent.left
@@ -2296,7 +2469,7 @@ Item {
 
         Row {
             anchors.left: parent.left
-            anchors.bottom: timeTrace.top
+            anchors.bottom: lyricBand.visible ? lyricBand.top : timeTrace.top
             anchors.bottomMargin: 8
             spacing: 10
             enabled: root.controlsVisible
