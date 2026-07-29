@@ -7,7 +7,9 @@
 #include "runtime/AuroraStateMapper.h"
 #include "runtime/AuroraTypes.h"
 #include "runtime/audio/AudioRuntime.h"
+#include "runtime/artwork/ArtworkIllustrationService.h"
 #include "runtime/library/LocalLibraryService.h"
+#include "runtime/lyrics/LyricsService.h"
 #include "runtime/memory/MomentService.h"
 #include "runtime/platform/MprisService.h"
 #include "runtime/sources/MusicSourceRegistry.h"
@@ -43,6 +45,13 @@ int main(int argc, char *argv[])
     Q_UNUSED(mprisService);
     qmlRegisterSingletonInstance(
         "Aurora.Runtime", 1, 0, "AudioRuntime", &audioRuntime);
+    LyricsService lyricsService;
+    qmlRegisterSingletonInstance(
+        "Aurora.Runtime", 1, 0, "Lyrics", &lyricsService);
+    ArtworkIllustrationService artworkIllustrationService;
+    qmlRegisterSingletonInstance(
+        "Aurora.Runtime", 1, 0, "ArtworkIllustration",
+        &artworkIllustrationService);
 
     qmlRegisterSingletonType<LocalLibraryService>(
         "Aurora.Runtime",

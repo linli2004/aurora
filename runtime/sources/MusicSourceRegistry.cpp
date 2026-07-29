@@ -332,6 +332,7 @@ MusicSourceRegistry::MusicSourceRegistry(QObject *parent)
 {
     m_onlineTracks = defaultOnlineTracks();
     loadSources();
+    QTimer::singleShot(0, this, &MusicSourceRegistry::loadOnlineTracks);
 }
 
 QVariantList MusicSourceRegistry::sources() const
@@ -520,8 +521,20 @@ void MusicSourceRegistry::loadOnlineTracks()
                 const auto sameTrack = [&track](const OnlineTrack &existing) {
                     return existing.source == track.source && existing.songId == track.songId;
                 };
-                if (std::none_of(mergedTracks.cbegin(), mergedTracks.cend(), sameTrack))
+                auto existing = std::find_if(
+                    mergedTracks.begin(), mergedTracks.end(), sameTrack);
+                if (existing == mergedTracks.end()) {
                     mergedTracks.append(track);
+                    continue;
+                }
+                if (!track.title.isEmpty())
+                    existing->title = track.title;
+                if (!track.artist.isEmpty())
+                    existing->artist = track.artist;
+                if (!track.album.isEmpty())
+                    existing->album = track.album;
+                if (!track.artworkUrl.isEmpty())
+                    existing->artworkUrl = track.artworkUrl;
             }
 
             m_onlineTracks = mergedTracks;

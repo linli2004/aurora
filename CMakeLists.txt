@@ -26,6 +26,10 @@ qt_add_executable(aurora
     runtime/audio/AudioQueue.h
     runtime/audio/AudioRuntime.cpp
     runtime/audio/AudioRuntime.h
+    runtime/artwork/ArtworkIllustrationService.cpp
+    runtime/artwork/ArtworkIllustrationService.h
+    runtime/cache/MediaCacheService.cpp
+    runtime/cache/MediaCacheService.h
     runtime/audio/LocalTrackIdentity.cpp
     runtime/audio/LocalTrackIdentity.h
     runtime/library/LocalLibraryRepository.cpp
@@ -36,6 +40,8 @@ qt_add_executable(aurora
     runtime/library/LocalLibraryTrackModel.h
     runtime/library/LocalLibraryWatcher.cpp
     runtime/library/LocalLibraryWatcher.h
+    runtime/lyrics/LyricsService.cpp
+    runtime/lyrics/LyricsService.h
     runtime/platform/MprisService.cpp
     runtime/platform/MprisService.h
     runtime/sources/MusicSourceRegistry.cpp
@@ -65,6 +71,7 @@ set(AURORA_QML_FILES
     qml/AuroraMoment.qml
     qml/AuroraHome.qml
     qml/MemoryFlow.qml
+    qml/MusicIllustrationSpace.qml
     qml/MusicSpace.qml
     qml/ComponentGallery.qml
     qml/IdentityTransitionLayer.qml
@@ -178,6 +185,8 @@ if(BUILD_TESTING)
         runtime/audio/AudioQueue.h
         runtime/audio/AudioRuntime.cpp
         runtime/audio/AudioRuntime.h
+        runtime/cache/MediaCacheService.cpp
+        runtime/cache/MediaCacheService.h
         runtime/audio/LocalTrackIdentity.cpp
         runtime/audio/LocalTrackIdentity.h
         runtime/library/LocalLibraryRepository.cpp
@@ -190,6 +199,7 @@ if(BUILD_TESTING)
         Qt6::Multimedia
         Qt6::Sql
         Qt6::Test
+        Qt6::Network
     )
     add_test(NAME aurora.audio_runtime COMMAND aurora_audio_runtime_tests)
 
@@ -274,6 +284,10 @@ if(BUILD_TESTING)
         runtime/audio/AudioQueue.h
         runtime/audio/AudioRuntime.cpp
         runtime/audio/AudioRuntime.h
+        runtime/artwork/ArtworkIllustrationService.cpp
+        runtime/artwork/ArtworkIllustrationService.h
+        runtime/cache/MediaCacheService.cpp
+        runtime/cache/MediaCacheService.h
         runtime/audio/LocalTrackIdentity.cpp
         runtime/audio/LocalTrackIdentity.h
         runtime/library/LocalLibraryRepository.cpp
@@ -284,6 +298,8 @@ if(BUILD_TESTING)
         runtime/library/LocalLibraryTrackModel.h
         runtime/library/LocalLibraryWatcher.cpp
         runtime/library/LocalLibraryWatcher.h
+        runtime/lyrics/LyricsService.cpp
+        runtime/lyrics/LyricsService.h
         runtime/sources/MusicSourceRegistry.cpp
         runtime/sources/MusicSourceRegistry.h
     )
@@ -319,6 +335,19 @@ if(BUILD_TESTING)
             fixtures/moments.json
             fixtures/tracks.json
     )
+
+    qt_add_executable(aurora_lyrics_service_tests
+        tests/test_lyrics_service.cpp
+        runtime/lyrics/LyricsService.cpp
+        runtime/lyrics/LyricsService.h
+    )
+    target_include_directories(aurora_lyrics_service_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(aurora_lyrics_service_tests PRIVATE
+        Qt6::Core
+        Qt6::Test
+        Qt6::Network
+    )
+    add_test(NAME aurora.lyrics_service COMMAND aurora_lyrics_service_tests)
 
     qt_add_executable(aurora_music_source_registry_tests
         tests/test_music_source_registry.cpp
