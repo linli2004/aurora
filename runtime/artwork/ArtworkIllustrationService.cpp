@@ -19,7 +19,7 @@
 #include <cmath>
 
 namespace {
-constexpr int artworkTimeoutMs = 12000;
+constexpr int artworkTimeoutMs = 20000;
 constexpr qint64 maximumArtworkDownloadBytes = 16LL * 1024LL * 1024LL;
 constexpr qint64 maximumArtworkCacheBytes = 256LL * 1024LL * 1024LL;
 constexpr qint64 maximumIllustrationCacheBytes = 384LL * 1024LL * 1024LL;
@@ -272,7 +272,23 @@ void ArtworkIllustrationService::beginRemoteLoad(
     request.setAttribute(
         QNetworkRequest::RedirectPolicyAttribute,
         QNetworkRequest::NoLessSafeRedirectPolicy);
-    request.setRawHeader("User-Agent", "Aurora-Music-Framework/1.0");
+    // AUR-SOURCE-ARTWORK-RECOVERY-PACK-01:ARTWORK-HEADERS
+    request.setAttribute(
+        QNetworkRequest::CacheLoadControlAttribute,
+        QNetworkRequest::PreferCache);
+    request.setRawHeader(
+        "User-Agent",
+        "Mozilla/5.0 (X11; Linux x86_64) "
+        "AppleWebKit/537.36 Aurora/1.0");
+    request.setRawHeader(
+        "Accept",
+        "image/avif,image/webp,image/apng,image/*,*/*;q=0.8");
+    request.setRawHeader(
+        "Accept-Language",
+        "zh-CN,zh;q=0.9,en;q=0.7");
+    request.setRawHeader(
+        "Referer",
+        "https://music.163.com/");
 
     QNetworkReply *reply = m_network->get(request);
     m_activeReply = reply;

@@ -65,6 +65,10 @@ set(AURORA_QML_FILES
     qml/MangaBackdrop.qml
     qml/MangaLanguageToggle.qml
     qml/LiquidTrackTransition.qml
+    qml/MusicNetworkTransitionOverlay.qml
+    qml/MusicNetworkTransitionGraph.qml
+    qml/MusicNetworkTransitionNode.qml
+    qml/MusicNetworkTravelLight.qml
     qml/AudioDiagnostics.qml
     qml/AuroraCore.qml
     qml/AuroraCrystal.qml
@@ -75,6 +79,7 @@ set(AURORA_QML_FILES
     qml/MusicSpace.qml
     qml/ComponentGallery.qml
     qml/IdentityTransitionLayer.qml
+    qml/MusicNetworkLayout.js
 )
 
 foreach(qml_file IN LISTS AURORA_QML_FILES)
@@ -96,6 +101,12 @@ set_source_files_properties(assets/demo-cover-a.png
 set_source_files_properties(assets/demo-cover-b.png
     PROPERTIES QT_RESOURCE_ALIAS "assets/demo-cover-b.png"
 )
+set_source_files_properties(assets/controls/mangekyo-eye-reference.png
+    PROPERTIES QT_RESOURCE_ALIAS "assets/controls/mangekyo-eye-reference.png"
+)
+set_source_files_properties(assets/controls/lamborghini-reference.png
+    PROPERTIES QT_RESOURCE_ALIAS "assets/controls/lamborghini-reference.png"
+)
 set_source_files_properties(fixtures/moments.json
     PROPERTIES QT_RESOURCE_ALIAS "fixtures/moments.json"
 )
@@ -111,6 +122,8 @@ qt_add_qml_module(aurora
     RESOURCES
         assets/demo-cover-a.png
         assets/demo-cover-b.png
+        assets/controls/mangekyo-eye-reference.png
+        assets/controls/lamborghini-reference.png
         fixtures/moments.json
         fixtures/tracks.json
 )
@@ -332,6 +345,8 @@ if(BUILD_TESTING)
         RESOURCES
             assets/demo-cover-a.png
             assets/demo-cover-b.png
+            assets/controls/mangekyo-eye-reference.png
+            assets/controls/lamborghini-reference.png
             fixtures/moments.json
             fixtures/tracks.json
     )

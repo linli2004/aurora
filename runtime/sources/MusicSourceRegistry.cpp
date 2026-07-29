@@ -91,17 +91,20 @@ QVariantMap resolvedOnlineTrackToMap(
 
 QList<MusicSourceRegistry::OnlineTrack> defaultOnlineTracks()
 {
+    const QString fallbackArtwork =
+        QStringLiteral("qrc:/qt/qml/Aurora/App/assets/demo-cover-a.png");
+
     return {
-        {QStringLiteral("wy"), QStringLiteral("1973665667"), QStringLiteral("海屿你"), QStringLiteral("马也_Crabbit"), QStringLiteral("海屿你"), {}},
-        {QStringLiteral("wy"), QStringLiteral("1303464858"), QStringLiteral("于是"), QStringLiteral("郑润泽"), QStringLiteral("于是"), {}},
-        {QStringLiteral("wy"), QStringLiteral("1827600686"), QStringLiteral("还是会想你"), QStringLiteral("林达浪 / h3R3"), QStringLiteral("还是会想你"), {}},
-        {QStringLiteral("wy"), QStringLiteral("33894312"), QStringLiteral("失眠"), QStringLiteral("Suki刘舒妤"), QStringLiteral("Ladies Night"), {}},
-        {QStringLiteral("wy"), QStringLiteral("3399839173"), QStringLiteral("甲乙丙丁"), QStringLiteral("李佳薇"), QStringLiteral("甲乙丙丁"), {}},
-        {QStringLiteral("wy"), QStringLiteral("3382908505"), QStringLiteral("玻璃"), QStringLiteral("Gareth.T"), QStringLiteral("玻璃"), {}},
-        {QStringLiteral("wy"), QStringLiteral("3404238777"), QStringLiteral("周旋"), QStringLiteral("王以太 / 艾热 AIR"), QStringLiteral("太热爱"), {}},
-        {QStringLiteral("wy"), QStringLiteral("488249475"), QStringLiteral("哪里都是你"), QStringLiteral("队长"), QStringLiteral("哪里都是你"), {}},
-        {QStringLiteral("wy"), QStringLiteral("27747329"), QStringLiteral("坠落"), QStringLiteral("蔡健雅"), QStringLiteral("天使与魔鬼的对话"), {}},
-        {QStringLiteral("wy"), QStringLiteral("31654343"), QStringLiteral("不将就"), QStringLiteral("李荣浩"), QStringLiteral("有理想"), {}},
+        {QStringLiteral("wy"), QStringLiteral("1973665667"), QStringLiteral("海屿你"), QStringLiteral("马也_Crabbit"), QStringLiteral("海屿你"), fallbackArtwork},
+        {QStringLiteral("wy"), QStringLiteral("1303464858"), QStringLiteral("于是"), QStringLiteral("郑润泽"), QStringLiteral("于是"), fallbackArtwork},
+        {QStringLiteral("wy"), QStringLiteral("1827600686"), QStringLiteral("还是会想你"), QStringLiteral("林达浪 / h3R3"), QStringLiteral("还是会想你"), fallbackArtwork},
+        {QStringLiteral("wy"), QStringLiteral("33894312"), QStringLiteral("失眠"), QStringLiteral("Suki刘舒妤"), QStringLiteral("Ladies Night"), fallbackArtwork},
+        {QStringLiteral("wy"), QStringLiteral("3399839173"), QStringLiteral("甲乙丙丁"), QStringLiteral("李佳薇"), QStringLiteral("甲乙丙丁"), fallbackArtwork},
+        {QStringLiteral("wy"), QStringLiteral("3382908505"), QStringLiteral("玻璃"), QStringLiteral("Gareth.T"), QStringLiteral("玻璃"), fallbackArtwork},
+        {QStringLiteral("wy"), QStringLiteral("3404238777"), QStringLiteral("周旋"), QStringLiteral("王以太 / 艾热 AIR"), QStringLiteral("太热爱"), fallbackArtwork},
+        {QStringLiteral("wy"), QStringLiteral("488249475"), QStringLiteral("哪里都是你"), QStringLiteral("队长"), QStringLiteral("哪里都是你"), fallbackArtwork},
+        {QStringLiteral("wy"), QStringLiteral("27747329"), QStringLiteral("坠落"), QStringLiteral("蔡健雅"), QStringLiteral("天使与魔鬼的对话"), fallbackArtwork},
+        {QStringLiteral("wy"), QStringLiteral("31654343"), QStringLiteral("不将就"), QStringLiteral("李荣浩"), QStringLiteral("有理想"), fallbackArtwork},
     };
 }
 
@@ -799,6 +802,7 @@ void MusicSourceRegistry::startResolveRequest(const ResolveRequest &request)
     m_resolveRequest = request;
     m_scriptEngine.reset();
     m_triedNetEasePublicMedia = false;
+    m_artworkLookupAttempted = false;
     ++m_resolveGeneration;
     setErrorString({});
     setStatusText(tr("Resolving %1:%2").arg(m_resolveRequest.source, m_resolveRequest.songId));
@@ -1351,6 +1355,144 @@ void MusicSourceRegistry::requestCurrentMusicUrl()
         scriptReject(hookResult);
 }
 
+
+// AUR-SOURCE-ARTWORK-RECOVERY-PACK-01:ARTWORK-LOOKUP
+void MusicSourceRegistry::resolvePendingArtworkThenFinish(
+    const QString &musicUrl)
+{
+    if (!m_pendingOnlineTrack.has_value()) {
+        finishCurrentResolver(musicUrl);
+        return;
+    }
+
+    const OnlineTrack pendingTrack =
+        m_pendingOnlineTrack.value();
+    if (pendingTrack.source != QStringLiteral("wy")
+        || pendingTrack.songId.isEmpty()) {
+        finishCurrentResolver(musicUrl);
+        return;
+    }
+
+    const int generation = m_resolveGeneration;
+    const QUrl detailUrl(
+        QStringLiteral(
+            "https://music.163.com/api/song/detail/?ids=[%1]")
+            .arg(pendingTrack.songId));
+
+    QNetworkRequest request(detailUrl);
+    request.setAttribute(
+        QNetworkRequest::RedirectPolicyAttribute,
+        QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setRawHeader(
+        "User-Agent",
+        "Mozilla/5.0 (X11; Linux x86_64) "
+        "AppleWebKit/537.36 Aurora/1.0");
+    request.setRawHeader(
+        "Accept",
+        "application/json,text/plain,*/*");
+    request.setRawHeader(
+        "Referer",
+        "https://music.163.com/");
+
+    setStatusText(
+        tr("Loading album artwork for %1.")
+            .arg(pendingTrack.title));
+
+    QNetworkReply *reply = m_network.get(request);
+    QTimer::singleShot(6000, reply, [reply]() {
+        if (reply->isRunning())
+            reply->abort();
+    });
+
+    connect(
+        reply,
+        &QNetworkReply::finished,
+        this,
+        [this, reply, generation, musicUrl, pendingTrack]() {
+            if (!m_resolving
+                || generation != m_resolveGeneration) {
+                reply->deleteLater();
+                return;
+            }
+
+            QString artworkUrl;
+            if (reply->error() == QNetworkReply::NoError) {
+                QJsonParseError parseError;
+                const QJsonDocument document =
+                    QJsonDocument::fromJson(
+                        reply->readAll(),
+                        &parseError);
+
+                if (parseError.error
+                        == QJsonParseError::NoError
+                    && document.isObject()) {
+                    const QJsonArray songs =
+                        document.object()
+                            .value(QStringLiteral("songs"))
+                            .toArray();
+
+                    if (!songs.isEmpty()) {
+                        const QJsonObject song =
+                            songs.first().toObject();
+                        QJsonObject album =
+                            song.value(
+                                QStringLiteral("album"))
+                                .toObject();
+
+                        if (album.isEmpty()) {
+                            album =
+                                song.value(
+                                    QStringLiteral("al"))
+                                    .toObject();
+                        }
+
+                        artworkUrl =
+                            album.value(
+                                QStringLiteral("picUrl"))
+                                .toString()
+                                .trimmed();
+                    }
+                }
+            }
+
+            reply->deleteLater();
+
+            if (artworkUrl.startsWith(
+                    QStringLiteral("http://"))) {
+                artworkUrl.replace(
+                    0,
+                    7,
+                    QStringLiteral("https://"));
+            }
+
+            if (!artworkUrl.isEmpty()
+                && m_pendingOnlineTrack.has_value()) {
+                m_pendingOnlineTrack->artworkUrl =
+                    artworkUrl;
+
+                bool catalogChanged = false;
+                for (OnlineTrack &track : m_onlineTracks) {
+                    if (track.source == pendingTrack.source
+                        && track.songId
+                            == pendingTrack.songId) {
+                        if (track.artworkUrl
+                            != artworkUrl) {
+                            track.artworkUrl =
+                                artworkUrl;
+                            catalogChanged = true;
+                        }
+                        break;
+                    }
+                }
+
+                if (catalogChanged)
+                    emit onlineTracksChanged();
+            }
+
+            finishCurrentResolver(musicUrl);
+        });
+}
+
 void MusicSourceRegistry::failCurrentResolver(const QString &message)
 {
     ++m_resolveGeneration;
@@ -1384,6 +1526,19 @@ void MusicSourceRegistry::failCurrentResolver(const QString &message)
 
 void MusicSourceRegistry::finishCurrentResolver(const QString &musicUrl)
 {
+    // AUR-SOURCE-ARTWORK-RECOVERY-PACK-01:FINISH-GUARD
+    if (m_pendingOnlineTrack.has_value()
+        && m_pendingOnlineTrack->source
+            == QStringLiteral("wy")
+        && m_pendingOnlineTrack->artworkUrl
+            .trimmed()
+            .isEmpty()
+        && !m_artworkLookupAttempted) {
+        m_artworkLookupAttempted = true;
+        resolvePendingArtworkThenFinish(musicUrl);
+        return;
+    }
+
     ++m_resolveGeneration;
     if (QJSEngine *engine = m_scriptEngine.release())
         engine->deleteLater();

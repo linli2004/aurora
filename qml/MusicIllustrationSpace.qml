@@ -315,7 +315,7 @@ Item {
         fillMode: Image.PreserveAspectFit
         smooth: true
         mipmap: true
-        asynchronous: false
+        asynchronous: true
         cache: false
         opacity: status === Image.Ready
                  ? Math.max(
@@ -642,7 +642,7 @@ Item {
                         smooth: true
                         mipmap: true
                         cache: true
-                        asynchronous: false
+                        asynchronous: true
                     }
                 }
 
