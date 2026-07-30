@@ -12,3 +12,5 @@ __pycache__/
 build-v0.4.log
 docs/tasks/
 docs/reviews/
+aurora-AUR-*
+assets/controls/
