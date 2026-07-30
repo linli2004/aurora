@@ -9,3 +9,6 @@
 *.jsc
 __pycache__/
 .DS_Store
+build-v0.4.log
+docs/tasks/
+docs/reviews/
